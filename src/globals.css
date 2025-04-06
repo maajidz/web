@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* DaisyUI v5/Tailwind v4 configuration */
+@plugin "daisyui" {
+  themes: light, dark, cupcake, bumblebee, emerald, corporate, synthwave --prefersdark, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury --default, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset;
+  logs: true; /* Enable logs */
+}
+
+/* DaisyUI v5/Tailwind v4 configuration */
+/* @plugin "daisyui"; */
+
+/* 
+@plugin "daisyui" {
+  themes: light, dark, cupcake, bumblebee, emerald, corporate, synthwave --prefersdark, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury --default, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset;
+  logs: true;
+}
+*/
+
+
+
+/* Base body styles (Theme might override some) */
+body {
+  font-family: 'Outfit', sans-serif;
+  margin: 0;
+  padding:0
+  /* DaisyUI theme will likely set background and text colors */
+}
+
+/* body * {
+  display: flex;
+} */
+/* Custom Logo Font Class */
+.font-logo {
+  font-family: 'Pacifico', cursive;
+}
+
+/* Custom Glassmorphism and Card Styles from original HTML */
+.swipe-card {
+  transition: transform 0.3s ease;
+  backdrop-filter: blur(12px);
+  /* background: rgba(30, 41, 59, 0.6); /* Consider adjusting based on synthwave bg */
+  /* border: 1px solid rgba(255, 255, 255, 0.1); /* Consider adjusting based on synthwave colors */
+  /* box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2); */
+  /* Apply theme's card background color if needed, or keep transparent */
+  /* background-color: hsla(var(--b2) / 0.6); /* Use DaisyUI variable for base-200 with opacity */
+}
+
+.swipe-card.swiped-left {
+  transform: translateX(-200%) rotate(-10deg);
+  opacity: 0;
+}
+
+.swipe-card.swiped-right {
+  transform: translateX(200%) rotate(10deg);
+  opacity: 0;
+}
+
+.card-stack {
+  position: relative;
+  /* height: 420px; /* Adjust as needed */
+  width: 100%;
+}
+
+.card-stack .swipe-card {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+
+/* Stacking effect - adjust if needed */
+.card-stack .swipe-card:nth-child(1) {
+  z-index: 3;
+}
+
+.card-stack .swipe-card:nth-child(2) {
+  z-index: 2;
+  transform: translateY(10px) scale(0.95);
+  opacity: 0.85;
+}
+
+.card-stack .swipe-card:nth-child(3) {
+  z-index: 1;
+  transform: translateY(20px) scale(0.9);
+  opacity: 0.7;
+}
+
+.glass-btn {
+  backdrop-filter: blur(8px);
+  /* background: rgba(255, 255, 255, 0.1); /* Adjust color based on theme? */
+  /* border: 1px solid rgba(255, 255, 255, 0.1); /* Adjust color based on theme? */
+  /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); */
+  transition: all 0.3s ease;
+  /* Example using DaisyUI vars */
+  /* background-color: hsla(var(--bc) / 0.1); /* Use DaisyUI variable for base-content with opacity */
+  /* border-color: hsla(var(--bc) / 0.1); /* Use DaisyUI variable for base-content with opacity */
+}
+
+.glass-btn:hover {
+  /* background: rgba(255, 255, 255, 0.15); /* Adjust color based on theme? */
+  /* border: 1px solid rgba(255, 255, 255, 0.2); /* Adjust color based on theme? */
+  /* Example using DaisyUI vars */
+  /* background-color: hsla(var(--bc) / 0.15); /* Use DaisyUI variable for base-content with opacity on hover */
+  /* border-color: hsla(var(--bc) / 0.2); /* Use DaisyUI variable for base-content with opacity on hover */
+}
+
+.glass-card {
+  backdrop-filter: blur(12px);
+  /* background: rgba(30, 41, 59, 0.5); /* Adjust color based on theme? */
+  /* border: 1px solid rgba(255, 255, 255, 0.08); /* Adjust color based on theme? */
+  /* box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2); */
+   /* Example using DaisyUI vars */
+  /* background-color: hsla(var(--b2) / 0.5); /* Use DaisyUI variable for base-200 with opacity */
+  /* border-color: hsla(var(--bc) / 0.1); /* Use DaisyUI variable for base-content with opacity */
+}
+
+.glass-gradient {
+  /* Example using DaisyUI vars - adjust colors as needed */
+  /* background: linear-gradient(135deg, hsla(var(--p)/.15), hsla(var(--s)/.15)); */
+  backdrop-filter: blur(10px);
+}
+
+/* Custom button radius if not overridden by DaisyUI */
+.rounded-button {
+  border-radius: 12px; /* Or use theme's default btn radius */
+}
+
+/* Ensure Remixicon base style is present if not loaded elsewhere*/
+/* :where([class^="ri-"])::before,
+:where([class*=" ri-"])::before {
+  font-family: remixicon!important;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+} */
+
+/* You might need to import the Inter and Pacifico fonts in your layout.tsx */ 
