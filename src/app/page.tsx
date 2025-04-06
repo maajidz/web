@@ -6,6 +6,7 @@ import TestimonialCard from '@/components/TestimonialCard';
 import PricingCard from '@/components/PricingCard';
 import CtaCard from '@/components/CtaCard';
 import TabBar from '@/components/TabBar';
+import { Suspense } from 'react';
 import {
   RiProfileLine,
   RiHeartLine,
@@ -36,11 +37,13 @@ export default function Home() {
 
       {/* Add padding top/bottom to account for fixed nav/tab bars */}
       <main className="pt-16 pb-16">
-        <HeroSection 
-            partnerKey={TRUECALLER_PARTNER_KEY}
-            partnerName={TRUECALLER_PARTNER_NAME}
-            phoneEmailClientId={PHONE_EMAIL_CLIENT_ID}
-        />
+        <Suspense fallback={<div className="text-center p-10">Loading Hero...</div>}>
+          <HeroSection 
+              partnerKey={TRUECALLER_PARTNER_KEY}
+              partnerName={TRUECALLER_PARTNER_NAME}
+              phoneEmailClientId={PHONE_EMAIL_CLIENT_ID}
+          />
+        </Suspense>
 
         <Section id="how-it-works" title="How Flattr Works">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
