@@ -62,27 +62,26 @@ export class AuthController {
       );
 
       if (result.success && result.access_token) {
-        this.logger.log(`Verification successful for user: ${result.userId}`);
+        this.logger.log(`Truecaller verification successful for user: ${result.userId}`);
         
         // Set JWT in HttpOnly cookie
         const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('auth-token', result.access_token, {
-          httpOnly: true, // Cannot be accessed by client-side scripts
-          // secure MUST be false if running locally over HTTP
-          secure: isProduction, // Explicitly use boolean 
-          sameSite: 'lax', // Protects against CSRF
-          maxAge: 7 * 24 * 60 * 60 * 1000, // Matches JWT expiration (7 days in ms)
-          path: '/', // Cookie available for all paths
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none',
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+          path: '/',
         });
         
-        // Redirect to frontend dashboard using configured URL
-        return res.redirect(`${frontendUrl}/dashboard`);
+        // Redirect user back to the frontend dashboard (or a success page)
+        res.redirect(`${frontendUrl}/dashboard?login=success`);
       } else {
         this.logger.warn(
           `Verification failed: ${result.error}. RequestId: ${callbackData.requestId}`,
         );
         // Redirect back to frontend with specific error using configured URL
-        return res.redirect(`${frontendUrl}/?error=${result.error || 'VerificationFailed'}`);
+        res.redirect(`${frontendUrl}/login?error=${result.error || 'TruecallerVerificationFailed'}`);
       }
     } catch (error: any) {
       this.logger.error(
@@ -90,7 +89,7 @@ export class AuthController {
         error?.stack,
       );
       // Redirect back to frontend with a generic server error using configured URL
-      return res.redirect(`${frontendUrl}/?error=ServerError`);
+      res.redirect(`${frontendUrl}/login?error=ServerError`);
     }
   }
 
@@ -115,9 +114,8 @@ export class AuthController {
         const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('auth-token', result.access_token, {
           httpOnly: true,
-          // secure MUST be false if running locally over HTTP
-          secure: isProduction, // Explicitly use boolean
-          sameSite: 'lax',
+          secure: true,
+          sameSite: 'none',
           maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
         });
