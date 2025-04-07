@@ -2,12 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
-import { Request, Response, NextFunction } from 'express';
-import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const logger = new Logger('Bootstrap');
   
   const configService = app.get(ConfigService);
 
@@ -18,19 +15,24 @@ async function bootstrap() {
   console.log('Allowed CORS Origins:', allowedOrigins);
 
   app.enableCors({
-    origin: '*', // Allow all origins temporarily for debugging
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-  });
-
-  // Add a middleware to log all requests
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    logger.log(`Incoming ${req.method} request to ${req.url}`);
-    logger.log('Request Headers:', req.headers);
-    next();
+    origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.length === 0) {
+          // If no origins are configured, potentially block all CORS requests or log a warning
+          console.warn('No ALLOWED_ORIGINS configured in .env file. Blocking CORS request from:', origin);
+          return callback(new Error('Not allowed by CORS'), false);
+      }
+      
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+        console.error(msg); // Log blocked origins
+        return callback(new Error('Not allowed by CORS'), false);
+      }
+      return callback(null, true);
+    },
+    credentials: true
   });
 
   app.use(cookieParser());
@@ -38,7 +40,7 @@ async function bootstrap() {
   const port = configService.get<number>('PORT') || 3001;
 
   await app.listen(port);
-  logger.log(`Application is running on: ${await app.getUrl()}`);
+  console.log(`Application is running on: http://localhost:${port}`);
 }
 
 bootstrap(); 
