@@ -4,6 +4,8 @@ import Script from "next/script";
 import "@/globals.css";
 import Navbar from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
+import { Analytics } from "@vercel/analytics/react"
+
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const pacifico = Pacifico({ weight: "400", subsets: ["latin"], variable: "--font-pacifico" });
@@ -69,6 +71,7 @@ export default function RootLayout({
         <AuthProvider>
           <Navbar />
           {children}
+          <Analytics />
         </AuthProvider>
       </body>
     </html>

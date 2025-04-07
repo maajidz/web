@@ -192,7 +192,7 @@ export class AuthService {
     lastName?: string | null,
   ): Promise<{ success: boolean; userId?: string; access_token?: string; error?: string }> {
     this.logger.log(`Validating user for phone: ${phoneNumber}`);
-    const supabase = this.supabaseService.supabaseAdmin;
+      const supabase = this.supabaseService.supabaseAdmin;
 
     try {
       // Check if user exists
@@ -235,7 +235,7 @@ export class AuthService {
         this.logger.log(`New user created: ${newUser.id}`);
         userIdToReturn = newUser.id;
       }
-
+      
       // Generate JWT
       if (userIdToReturn) {
           const payload = { sub: userIdToReturn };
@@ -249,7 +249,7 @@ export class AuthService {
 
     } catch (error: any) {
        this.logger.error(`Error during user validation/login for phone ${phoneNumber}: ${error?.message || error}`, error?.stack);
-       return { success: false, error: 'InternalServerError' };
+      return { success: false, error: 'InternalServerError' };
     }
   }
 
