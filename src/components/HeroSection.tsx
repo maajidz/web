@@ -95,6 +95,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
           // Send the user_json_url to your backend for final verification and login
           const response = await fetch(verifyUrl, { // Use the absolute URL
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_json_url: payload.user_json_url }),
           });

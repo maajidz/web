@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
+import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -15,25 +16,20 @@ async function bootstrap() {
   console.log('Allowed CORS Origins:', allowedOrigins);
 
   app.enableCors({
-    origin: true,
-    // origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
-    //   // Allow requests with no origin (like mobile apps or curl requests)
-    //   if (!origin) return callback(null, true);
-      
-    //   if (allowedOrigins.length === 0) {
-    //       // If no origins are configured, potentially block all CORS requests or log a warning
-    //       console.warn('No ALLOWED_ORIGINS configured in .env file. Blocking CORS request from:', origin);
-    //       return callback(new Error('Not allowed by CORS'), false);
-    //   }
-      
-    //   if (allowedOrigins.indexOf(origin) === -1) {
-    //     const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-    //     console.error(msg); // Log blocked origins
-    //     return callback(new Error('Not allowed by CORS'), false);
-    //   }
-    //   return callback(null, true);
-    // },
-    credentials: true
+    origin: '*', // Allow all origins temporarily for debugging
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+  });
+
+  // Add a middleware to log all requests
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    console.log(`${req.method} ${req.url}`);
+    console.log('Origin:', req.headers.origin);
+    console.log('Headers:', req.headers);
+    next();
   });
 
   app.use(cookieParser());
