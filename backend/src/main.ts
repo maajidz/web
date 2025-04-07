@@ -3,9 +3,11 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 import { Request, Response, NextFunction } from 'express';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
   
   const configService = app.get(ConfigService);
 
@@ -26,9 +28,8 @@ async function bootstrap() {
 
   // Add a middleware to log all requests
   app.use((req: Request, res: Response, next: NextFunction) => {
-    console.log(`${req.method} ${req.url}`);
-    console.log('Origin:', req.headers.origin);
-    console.log('Headers:', req.headers);
+    logger.log(`Incoming ${req.method} request to ${req.url}`);
+    logger.log('Request Headers:', req.headers);
     next();
   });
 
@@ -37,7 +38,7 @@ async function bootstrap() {
   const port = configService.get<number>('PORT') || 3001;
 
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`Application is running on: ${await app.getUrl()}`);
 }
 
 bootstrap(); 
