@@ -85,16 +85,16 @@ export class AuthService {
         return { success: false, error: 'TruecallerProfileMissingPhone' };
       }
 
-       // Simple format check/cleanup (e.g., remove leading '+') - adjust as needed
-       // Now safe to call startsWith on phoneNumberStr
-       const formattedPhoneNumber = phoneNumberStr.startsWith('+') ? phoneNumberStr.substring(1) : phoneNumberStr;
+       // Standardize phone number: Remove leading '+', ensure it contains digits only
+       // Assumes Truecaller provides the number including country code.
+       const standardizedPhoneNumber = phoneNumberStr.replace(/\D/g, ''); // Remove non-digits (like +)
 
-      this.logger.log(`Truecaller profile fetched for phone: ${formattedPhoneNumber}`);
+      this.logger.log(`Truecaller profile fetched & standardized for phone: ${standardizedPhoneNumber}`);
 
       // 2. Check if user exists in Supabase & Login/Create
       // Use the refactored method
       return this.validateAndLoginUser(
-        formattedPhoneNumber,
+        standardizedPhoneNumber, // Use standardized number
         truecallerProfile.firstName,
         truecallerProfile.lastName
       );
