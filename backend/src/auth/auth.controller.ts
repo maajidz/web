@@ -76,9 +76,10 @@ export class AuthController {
           path: '/',
         });
         
-        // Log redirect attempt
-        const redirectUrl = `${frontendUrl}/dashboard`;
-        this.logger.log(`Redirecting user ${result.userId} to: ${redirectUrl}`);
+        // For browser-based flow (mobile web), we'll use a special success parameter 
+        // that the frontend can detect, rather than a server-side redirect
+        const redirectUrl = `${frontendUrl}/login?auth_success=true&user_id=${result.userId}`;
+        this.logger.log(`Redirecting user ${result.userId} to: ${redirectUrl} with success parameter`);
         res.redirect(redirectUrl);
         return;
       } else {

@@ -221,29 +221,25 @@ export class AuthService {
         // User exists - Login
         this.logger.log(`Existing user found: ${existingUser.id} for phone ${phoneNumber}`);
         userIdToReturn = existingUser.id;
-        // Update existing user's profile data if provided
+        // TEMPORARILY DISABLED: Profile update until correct column names are confirmed
         if (firstName || lastName || email || avatarUrl) {
-          this.logger.log(`Updating profile data for existing user: ${existingUser.id}`);
-          const updateData: any = {};
-          
-          // Only include fields that are provided
-          if (firstName) updateData.first_name = firstName;
-          if (lastName) updateData.last_name = lastName;
-          if (email) updateData.email = email;
-          if (avatarUrl) updateData.avatar_url = avatarUrl;
-          
-          // Update the user profile
-          const { error: updateError } = await supabase
-            .from('user_profiles')
-            .update(updateData)
-            .eq('id', existingUser.id);
-            
-          if (updateError) {
-            this.logger.warn(`Could not update profile for user ${existingUser.id}: ${updateError.message}`);
-            // Continue with login even if update fails
-          } else {
-            this.logger.log(`Profile updated successfully for user: ${existingUser.id}`);
-          }
+          this.logger.log(`Not updating profile data for existing user: ${existingUser.id} until column names are confirmed`);
+          // DEBUG: Log what the profile structure should be
+          this.logger.debug('Would have updated these fields:', JSON.stringify({
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            avatarUrl: avatarUrl,
+            // Log other potential column names for the avatar
+            potential_column_names: {
+              'avatar_url': avatarUrl,
+              'profile_picture_url': avatarUrl,
+              'profile_picture': avatarUrl,
+              'profile_img': avatarUrl,
+              'avatar': avatarUrl,
+              'picture_url': avatarUrl
+            }
+          }));
         }
 
       } else {
