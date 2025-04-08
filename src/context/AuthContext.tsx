@@ -45,8 +45,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Auth check successful, user:', data.userId);
-        setUserId(data.userId || null);
+        console.log('Auth check successful, user ID:', data.id);
+        setUserId(data.id || null);
       } else if (response.status === 401) {
         console.log('Auth check failed (401), user not logged in.');
         setUserId(null); // Not authenticated
