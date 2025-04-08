@@ -32,7 +32,7 @@ interface DbUserProfile {
   email?: string | null; // Assuming text/varchar, nullable
   profile_type?: string | null; // Assuming text/varchar or enum, nullable
   bio?: string | null; // Assuming text, nullable
-  avatar_url?: string | null; // Assuming text/varchar, nullable
+  profile_picture_url?: string | null; // Assuming text/varchar, nullable
   created_at: string; // Assuming timestamp string
   updated_at?: string | null; // Assuming timestamp string, nullable
 }
@@ -221,25 +221,29 @@ export class AuthService {
         // User exists - Login
         this.logger.log(`Existing user found: ${existingUser.id} for phone ${phoneNumber}`);
         userIdToReturn = existingUser.id;
-        // TEMPORARILY DISABLED: Profile update until correct column names are confirmed
+        // Re-enabled profile update with correct column name
         if (firstName || lastName || email || avatarUrl) {
-          this.logger.log(`Not updating profile data for existing user: ${existingUser.id} until column names are confirmed`);
-          // DEBUG: Log what the profile structure should be
-          this.logger.debug('Would have updated these fields:', JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            avatarUrl: avatarUrl,
-            // Log other potential column names for the avatar
-            potential_column_names: {
-              'avatar_url': avatarUrl,
-              'profile_picture_url': avatarUrl,
-              'profile_picture': avatarUrl,
-              'profile_img': avatarUrl,
-              'avatar': avatarUrl,
-              'picture_url': avatarUrl
-            }
-          }));
+          this.logger.log(`Updating profile data for existing user: ${existingUser.id}`);
+          const updateData: any = {};
+          
+          // Only include fields that are provided
+          if (firstName) updateData.first_name = firstName;
+          if (lastName) updateData.last_name = lastName;
+          if (email) updateData.email = email;
+          if (avatarUrl) updateData.profile_picture_url = avatarUrl;
+          
+          // Update the user profile
+          const { error: updateError } = await supabase
+            .from('user_profiles')
+            .update(updateData)
+            .eq('id', existingUser.id);
+            
+          if (updateError) {
+            this.logger.warn(`Could not update profile for user ${existingUser.id}: ${updateError.message}`);
+            // Continue with login even if update fails
+          } else {
+            this.logger.log(`Profile updated successfully for user: ${existingUser.id}`);
+          }
         }
 
       } else {
@@ -253,7 +257,7 @@ export class AuthService {
             first_name: firstName || null, // Use provided or null
             last_name: lastName || null,  // Use provided or null
             email: email || null,         // Use provided or null
-            avatar_url: avatarUrl || null // Use avatar_url as the column name
+            profile_picture_url: avatarUrl || null // Use profile_picture_url from the schema
             // ---- End using provided data ----
           })
           .select('id') // Select the ID of the newly inserted row
@@ -376,7 +380,7 @@ export class AuthService {
           first_name: firstName,
           last_name: lastName,
           // Only include profile picture if provided
-          ...(profilePictureUrl && { avatar_url: profilePictureUrl }),
+          ...(profilePictureUrl && { profile_picture_url: profilePictureUrl }),
           // We can also force updated_at if desired, but Supabase might handle it
       };
 
