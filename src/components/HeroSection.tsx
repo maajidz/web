@@ -270,13 +270,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
 
           {/* Initial Button or Loading State - Show if Idle or Loading */}
           {(authState === AuthProcessState.Idle || isLoading) && (
-            <PrettyButton
-              className={`w-full max-w-xs ${isLoading ? 'loading' : ''}`}
+            <button 
+              className={`btn btn-primary btn-sm ${isLoading ? 'loading' : ''}`}
               onClick={handleLoginClick}
               disabled={isLoading}
             >
               {isLoading ? 'Processing...' : 'Login / Sign Up'}
-            </PrettyButton>
+            </button>
           )}
 
            {/* Loading state specifically for Truecaller */}
