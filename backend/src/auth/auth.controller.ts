@@ -19,9 +19,8 @@ import { ConfigService } from '@nestjs/config';
 
 // DTO for expected callback body (adjust if needed based on actual Truecaller payload)
 class TruecallerCallbackDto {
-  requestId?: string;
-  accessToken?: string;
-  status?: string;
+  requestId: string = '';
+  accessToken: string = '';
   // Add other potential fields if Truecaller sends them
 }
 
@@ -34,29 +33,27 @@ export class AuthController {
     private readonly configService: ConfigService
   ) {}
 
-  @Post('true-sdk')
+  @Post('true-sdk') // Matches your specified callback URL path
   async handleTruecallerCallback(
     @Body() callbackData: TruecallerCallbackDto,
     @Res({ passthrough: true }) res: Response,
-    @Req() req: Request,
   ) {
     this.logger.log(
-      `Received Truecaller callback for requestId: ${callbackData.requestId ?? 'N/A'}`,
+      `Received Truecaller callback for requestId: ${callbackData.requestId}`,
     );
-    this.logger.debug(`Truecaller Callback Headers: ${JSON.stringify(req.headers)}`);
-    this.logger.debug(`Full Truecaller Callback Body: ${JSON.stringify(callbackData)}`);
 
+    // Get frontend URL from config
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || '';
     if (!frontendUrl) {
         this.logger.error('FRONTEND_URL environment variable is not set!');
+        // Handle error appropriately, maybe redirect to a generic error page or return 500
         throw new HttpException('Server configuration error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     if (!callbackData.accessToken) {
-        this.logger.error('Access Token missing in Truecaller callback payload');
-        this.logger.log(`Redirecting due to missing token: ${frontendUrl}/?error=CallbackTokenMissing`);
-        res.redirect(`${frontendUrl}/?error=CallbackTokenMissing`);
-        return;
+        this.logger.error('Access Token missing in Truecaller callback');
+        // Redirect back to frontend with error
+        return res.redirect(`${frontendUrl}/?error=CallbackTokenMissing`);
     }
 
     try {
@@ -67,33 +64,33 @@ export class AuthController {
       if (result.success && result.access_token) {
         this.logger.log(`Truecaller verification successful for user: ${result.userId}`);
         
+        // Set JWT in HttpOnly cookie
+        const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('auth-token', result.access_token, {
           httpOnly: true,
           secure: true,
-          sameSite: 'none',
+          sameSite: 'lax',
           partitioned: true,
           maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
         });
         
-        this.logger.log(`Redirecting after successful Truecaller login: ${frontendUrl}/dashboard?login=success`);
+        // Redirect user back to the frontend dashboard (or a success page)
         res.redirect(`${frontendUrl}/dashboard?login=success`);
       } else {
         this.logger.warn(
-          `Verification failed: ${result.error}. RequestId: ${callbackData.requestId ?? 'N/A'}`,
+          `Verification failed: ${result.error}. RequestId: ${callbackData.requestId}`,
         );
-        const redirectUrl = `${frontendUrl}/login?error=${result.error || 'TruecallerVerificationFailed'}`;
-        this.logger.log(`Redirecting after failed Truecaller verification: ${redirectUrl}`);
-        res.redirect(redirectUrl);
+        // Redirect back to frontend with specific error using configured URL
+        res.redirect(`${frontendUrl}/login?error=${result.error || 'TruecallerVerificationFailed'}`);
       }
     } catch (error: any) {
       this.logger.error(
         `Internal server error during Truecaller verification: ${error?.message || error}`,
         error?.stack,
       );
-      const redirectUrl = `${frontendUrl}/login?error=ServerError`;
-      this.logger.log(`Redirecting after internal server error: ${redirectUrl}`);
-      res.redirect(redirectUrl);
+      // Redirect back to frontend with a generic server error using configured URL
+      res.redirect(`${frontendUrl}/login?error=ServerError`);
     }
   }
 
@@ -114,28 +111,33 @@ export class AuthController {
       if (result.success && result.access_token) {
         this.logger.log(`Phone.email verification successful for user: ${result.userId}`);
 
+        // Set JWT in HttpOnly cookie (same as Truecaller)
+        const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('auth-token', result.access_token, {
           httpOnly: true,
           secure: true,
-          sameSite: 'none',
-          partitioned: true,
+          sameSite: 'lax',
+          // partitioned: true,
           maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
         });
 
+        // Send success response (no redirect needed as this is called via fetch)
         return { success: true, userId: result.userId };
       } else {
         this.logger.warn(
           `Phone.email verification failed: ${result.error}`,
         );
+        // Throw HttpException for the frontend fetch to catch
         throw new HttpException(
           result.error || 'PhoneEmailVerificationFailed',
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST, // Or potentially UNAUTHORIZED depending on error
         );
       }
     } catch (error: any) {
+        // Handle errors thrown from the service or the HttpException above
         if (error instanceof HttpException) {
-           throw error;
+           throw error; // Re-throw known HTTP exceptions
         }
       this.logger.error(
         `Internal server error during Phone.email verification: ${error?.message || error}`,
@@ -148,13 +150,15 @@ export class AuthController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  // New protected route
+  @UseGuards(JwtAuthGuard) // Apply the guard
   @Get('profile')
-  async getProfile(@Req() req: Request) {
+  async getProfile(@Req() req: Request) { // Access the extended Request object
     this.logger.log(`Fetching profile for user: ${req.user?.sub}`);
     if (!req.user?.sub) {
       throw new HttpException('User ID not found in token', HttpStatus.UNAUTHORIZED);
     }
+    // Fetch the full profile using the service method
     const userProfile = await this.authService.getUserProfile(req.user.sub);
     if (!userProfile) {
       throw new HttpException('Profile not found', HttpStatus.NOT_FOUND);
@@ -162,13 +166,15 @@ export class AuthController {
     return userProfile;
   }
 
+  // Optional: Add a logout route
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
     this.logger.log('Logging out user');
-    res.clearCookie('auth-token', { path: '/' });
+    res.clearCookie('auth-token', { path: '/' }); // Clear the auth cookie
     return { message: 'Logged out successfully' };
   }
 
+  // --- Simple Diagnostic Route ---
   @Get('ping')
   ping(): string {
       this.logger.log('Received ping request');

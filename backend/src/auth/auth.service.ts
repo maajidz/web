@@ -10,24 +10,14 @@ import { SupabaseService } from '../supabase/supabase.service'; // Adjust path i
 import { firstValueFrom, map, catchError } from 'rxjs';
 import { AxiosError } from 'axios';
 import { JwtService } from '@nestjs/jwt'; // Import JwtService
-import { ConfigService } from '@nestjs/config';
 
 // Interface for the expected Truecaller profile structure
 // Adjust based on the actual data returned by their API
 export interface TruecallerProfile {
-  id?: string;
-  userId?: number;
-  phoneNumbers?: number[]; // Or string[]? Verify based on log
-  name?: {
-    first?: string;
-    last?: string;
-  };
-  addresses?: { countryCode?: string }[];
-  onlineIdentities?: {
-    email?: string;
-  };
-  avatarUrl?: string;
-  // Add other fields if needed
+  firstName?: string;
+  lastName?: string;
+  phoneNumbers?: string[];
+  // Add other relevant fields like email, city, etc.
 }
 
 // Interface for the user profile in your Supabase table
@@ -49,9 +39,9 @@ interface UserProfile {
 interface PhoneEmailPayload {
   user_country_code: string;
   user_phone_number: string;
-  // Add potentially available fields based on observation
-  user_first_name?: string;
-  user_last_name?: string;
+  // Add other fields if needed (e.g., first/last name)
+  // user_first_name?: string;
+  // user_last_name?: string;
 }
 
 @Injectable()
@@ -64,52 +54,49 @@ export class AuthService {
     private readonly httpService: HttpService,
     private readonly supabaseService: SupabaseService,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
   ) {}
 
   async verifyTruecallerUser(
     accessToken: string,
   ): Promise<{ success: boolean; userId?: string; access_token?: string; error?: string }> {
-    this.logger.log(`Fetching Truecaller profile for token: ${accessToken.substring(0, 10)}...`);
-    const profileUrl = 'https://profile4.truecaller.com/v1/default'; // Use appropriate endpoint if needed
-
     try {
-      const response = await firstValueFrom(
-        this.httpService.get<TruecallerProfile>(profileUrl, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }),
-      );
+      // 1. Fetch profile from Truecaller
+      this.logger.log(`Fetching Truecaller profile for token: ${accessToken.substring(0, 10)}...`);
+      const truecallerProfile = await this.fetchTruecallerProfile(accessToken);
 
-      const truecallerProfile = response.data;
-      // Log the full profile at debug level
-      this.logger.debug(`Fetched Truecaller Profile: ${JSON.stringify(truecallerProfile)}`);
+      if (!truecallerProfile) {
+        return { success: false, error: 'FailedToFetchTruecallerProfile' };
+      }
 
+      // Extract primary phone number (assuming the first one is primary)
+      let phoneNumber: string | number | undefined | null = truecallerProfile.phoneNumbers?.[0];
+      let phoneNumberStr: string;
 
-      if (!truecallerProfile?.phoneNumbers || truecallerProfile.phoneNumbers.length === 0) {
-        this.logger.error('Truecaller profile response missing phone number');
+      // Add check to ensure phoneNumber is a string or a number
+      if (typeof phoneNumber === 'number') {
+        phoneNumberStr = String(phoneNumber);
+      } else if (typeof phoneNumber === 'string' && phoneNumber.length > 0) {
+        phoneNumberStr = phoneNumber;
+      } else {
+        // Handle cases where it's null, undefined, empty string, or other type
+        this.logger.warn(
+            `Phone number missing or invalid type in Truecaller profile. Value: ${phoneNumber}, Profile data: ${JSON.stringify(truecallerProfile)}`
+        );
         return { success: false, error: 'TruecallerProfileMissingPhone' };
       }
 
-      // Convert phone number to string if it's a number
-      const phoneNumberStr = String(truecallerProfile.phoneNumbers[0]);
-      // Standardize phone number: Remove non-digits (like +)
-      const standardizedPhoneNumber = phoneNumberStr.replace(/\D/g, '');
+       // Standardize phone number: Remove leading '+', ensure it contains digits only
+       // Assumes Truecaller provides the number including country code.
+       const standardizedPhoneNumber = phoneNumberStr.replace(/\D/g, ''); // Remove non-digits (like +)
 
       this.logger.log(`Truecaller profile fetched & standardized for phone: ${standardizedPhoneNumber}`);
 
-      // Extract potential extra fields
-      const firstName = truecallerProfile.name?.first;
-      const lastName = truecallerProfile.name?.last;
-      const email = truecallerProfile.onlineIdentities?.email;
-      const avatarUrl = truecallerProfile.avatarUrl; // Assuming this is the field name
-
-      // Call validateAndLoginUser with extracted data
+      // 2. Check if user exists in Supabase & Login/Create
+      // Use the refactored method
       return this.validateAndLoginUser(
-        standardizedPhoneNumber,
-        firstName,
-        lastName,
-        email, // Pass email
-        avatarUrl // Pass avatarUrl (to be saved as profile_pic_url)
+        standardizedPhoneNumber, // Use standardized number
+        truecallerProfile.firstName,
+        truecallerProfile.lastName
       );
 
     } catch (error: any) {
@@ -125,7 +112,6 @@ export class AuthService {
           }`,
         );
         if (error?.response?.status === 401) {
-          this.logger.error(`Invalid Truecaller access token used.`);
           return { success: false, error: 'InvalidTruecallerToken' };
         }
         return { success: false, error: 'TruecallerApiError' };
@@ -138,42 +124,30 @@ export class AuthService {
   async verifyPhoneEmail(
     userJsonUrl: string
   ): Promise<{ success: boolean; userId?: string; access_token?: string; error?: string }> {
-    this.logger.log(`Fetching Phone.email payload from URL starting with: ${userJsonUrl.substring(0, 30)}...`);
+    this.logger.log(`Verifying Phone.email URL: ${userJsonUrl}`);
 
-    if (!userJsonUrl.startsWith('https://prod-phoneemail-eu.s3.eu-west-1.amazonaws.com/')) {
-        this.logger.error(`Invalid user_json_url prefix: ${userJsonUrl}`);
-        return { success: false, error: 'InvalidPayloadUrl' };
+    // 1. Basic URL validation already done by DTO, but double check domain
+    if (!userJsonUrl || !userJsonUrl.startsWith('https://user.phone.email/')) {
+      this.logger.warn(`Invalid user_json_url received: ${userJsonUrl}`);
+      return { success: false, error: 'InvalidPhoneEmailUrl' };
     }
 
     try {
-      const response = await firstValueFrom(
-        this.httpService.get<PhoneEmailPayload>(userJsonUrl)
-      );
-      const phoneEmailData = response.data;
-      this.logger.debug(`Fetched Phone.email Payload: ${JSON.stringify(phoneEmailData)}`);
+      // 2. Fetch data from Phone.email JSON URL
+      const phoneEmailData = await this.fetchPhoneEmailData(userJsonUrl);
 
-
-      if (!phoneEmailData.user_phone_number || !phoneEmailData.user_country_code) {
-          this.logger.error('Phone.email payload missing phone number or country code');
-          return { success: false, error: 'PayloadMissingPhoneInfo' };
+      if (!phoneEmailData?.user_country_code || !phoneEmailData?.user_phone_number) {
+         this.logger.warn(`Missing required fields in Phone.email payload: ${JSON.stringify(phoneEmailData)}`);
+        return { success: false, error: 'PhoneEmailDataMissing' };
       }
 
-      // Standardize phone number (remove leading + if present, ensure only digits)
-      const formattedPhoneNumber = `${phoneEmailData.user_country_code}${phoneEmailData.user_phone_number}`.replace(/\D/g, '');
+      // 3. Format phone number (e.g., combine country code and number, remove plus)
+      // Assuming user_phone_number does NOT include country code based on docs
+      const formattedPhoneNumber = `${phoneEmailData.user_country_code}${phoneEmailData.user_phone_number}`.replace(/^\+/, '');
+      this.logger.log(`Phone.email verified phone number: ${formattedPhoneNumber}`);
 
-      this.logger.log(`Phone.email payload processed for phone: ${formattedPhoneNumber}`);
-
-      // Pass optional name fields
-      const firstName = phoneEmailData.user_first_name;
-      const lastName = phoneEmailData.user_last_name;
-
-      // Call validateAndLoginUser
-      return this.validateAndLoginUser(
-        formattedPhoneNumber,
-        firstName,
-        lastName
-        // Email/Avatar not typically provided by Phone.email payload AFAIK
-      );
+      // 4. Check/Create user in Supabase & Generate Token (reuse logic)
+      return this.validateAndLoginUser(formattedPhoneNumber /*, optional first/last name if available */);
 
     } catch (error: any) {
        this.logger.error(
@@ -182,118 +156,99 @@ export class AuthService {
        );
        if (error instanceof AxiosError) {
           // Handle specific errors from the GET request to Phone.email URL
-           return { success: false, error: 'FailedToFetchPayload' };
+           return { success: false, error: 'FailedToFetchPhoneEmailData' };
        }
        return { success: false, error: 'InternalServerError' };
     }
   }
 
+  // --- Helper to Fetch Phone.email Data ---
+  private async fetchPhoneEmailData(url: string): Promise<PhoneEmailPayload | null> {
+     try {
+      const response = await firstValueFrom(
+        this.httpService
+          .get<PhoneEmailPayload>(url)
+          .pipe(
+             map((res) => res.data),
+             catchError((error: AxiosError) => {
+               this.logger.error(`Axios error fetching Phone.email URL (${url}): ${error.response?.status} - ${error.message}`, error.stack);
+               // Don't throw here, let the main handler catch and return specific error
+               throw error;
+             }),
+           )
+       );
+      return response;
+     } catch (error) {
+       // Logged in catchError, rethrow to be handled by verifyPhoneEmail
+       throw error;
+     }
+  }
+
   // --- Refactored User Validation & Login Logic ---
   private async validateAndLoginUser(
     phoneNumber: string,
+    // Optionally pass first/last name if available from verification source
     firstName?: string | null,
     lastName?: string | null,
-    email?: string | null, // Add email parameter
-    profilePicUrl?: string | null, // Add profilePicUrl parameter
   ): Promise<{ success: boolean; userId?: string; access_token?: string; error?: string }> {
     this.logger.log(`Validating user for phone: ${phoneNumber}`);
-    const supabase = this.supabaseService.supabaseAdmin;
+      const supabase = this.supabaseService.supabaseAdmin;
 
     try {
       // Check if user exists
       const { data: existingUser, error: fetchError } = await supabase
         .from('user_profiles')
-        .select('id, first_name, last_name, email, profile_pic_url') // Select fields to check/update
+        .select('id')
         .eq('phone_number', phoneNumber)
         .maybeSingle();
 
       if (fetchError) {
-        this.logger.error(`Supabase error fetching user by phone: ${fetchError.message}`, fetchError.stack);
+        this.logger.error(`Supabase fetch error: ${fetchError.message}`, fetchError.stack);
         return { success: false, error: 'DatabaseFetchError' };
       }
 
       let userIdToReturn: string | undefined;
-      let needsUpdate = false;
-      const updates: Partial<UserProfile> = {}; // Define updates object
-
       if (existingUser) {
-        // --- User exists - Login & Potential Update ---
+        // User exists - Login
         this.logger.log(`Existing user found: ${existingUser.id}`);
         userIdToReturn = existingUser.id;
-
-        // Check if we got potentially new/updated info from the login provider
-        if (firstName && !existingUser.first_name) {
-           updates.first_name = firstName; needsUpdate = true;
-        }
-        if (lastName && !existingUser.last_name) {
-           updates.last_name = lastName; needsUpdate = true;
-        }
-        if (email && !existingUser.email) {
-           updates.email = email; needsUpdate = true;
-        }
-        if (profilePicUrl && !existingUser.profile_pic_url) {
-           updates.profile_pic_url = profilePicUrl; needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-          this.logger.log(`Updating existing user profile (${userIdToReturn}) with new details.`);
-          const { error: updateError } = await supabase
-            .from('user_profiles')
-            .update(updates)
-            .eq('id', userIdToReturn);
-
-          if (updateError) {
-            this.logger.error(`Supabase error updating profile: ${updateError.message}`, updateError.stack);
-            // Log error but proceed with login - update isn't critical path
-          } else {
-             this.logger.log(`Profile updated successfully for user: ${userIdToReturn}`);
-          }
-        }
-
+        // Potential future logic: Update name if verification source provides it?
       } else {
-        // --- User doesn't exist - Signup ---
+        // User doesn't exist - Signup
         this.logger.log(`Creating new user profile for phone: ${phoneNumber}`);
         const { data: newUser, error: insertError } = await supabase
           .from('user_profiles')
-          .insert({ // Include all fields
+          .insert({
             phone_number: phoneNumber,
             first_name: firstName || null,
             last_name: lastName || null,
-            email: email || null,
-            profile_pic_url: profilePicUrl || null,
+            // Set other defaults if needed
           })
           .select('id')
-          .single(); // Expects insert to return the new row
+          .single();
 
         if (insertError) {
-          this.logger.error(`Supabase error inserting new user: ${insertError.message}`, insertError.stack);
+          this.logger.error(`Supabase insert error: ${insertError.message}`, insertError.stack);
           return { success: false, error: 'DatabaseInsertError' };
-        }
-        if (!newUser) {
-             this.logger.error('Supabase insert succeeded but returned no data.');
-             return { success: false, error: 'DatabaseInsertError' };
         }
 
         this.logger.log(`New user created: ${newUser.id}`);
         userIdToReturn = newUser.id;
       }
-
-      // --- Generate JWT ---
+      
+      // Generate JWT
       if (userIdToReturn) {
-        const payload = { sub: userIdToReturn }; // 'sub' is standard JWT claim for subject (user ID)
-        const generatedToken = await this.jwtService.signAsync(payload, {
-             secret: this.configService.get<string>('JWT_SECRET'),
-             expiresIn: this.configService.get<string>('JWT_EXPIRATION_TIME') || '7d',
-         });
-        this.logger.log(`JWT generated successfully for user: ${userIdToReturn}`);
-        return { success: true, userId: userIdToReturn, access_token: generatedToken };
+          const payload = { sub: userIdToReturn };
+          const generatedToken = await this.jwtService.signAsync(payload);
+          this.logger.log(`JWT generated successfully for user: ${userIdToReturn}`);
+          return { success: true, userId: userIdToReturn, access_token: generatedToken };
       } else {
-        // This case should ideally not be reached if logic above is correct
-        this.logger.error('User ID was undefined after validation/creation flow.');
-        return { success: false, error: 'UserValidationFailed' };
+          this.logger.error('User ID was not determined after validation/creation.');
+          return { success: false, error: 'UserIdResolutionFailed' };
       }
+
     } catch (error: any) {
-      this.logger.error(`Unexpected error during user validation/login: ${error?.message || error}`, error?.stack);
+       this.logger.error(`Error during user validation/login for phone ${phoneNumber}: ${error?.message || error}`, error?.stack);
       return { success: false, error: 'InternalServerError' };
     }
   }
