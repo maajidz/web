@@ -37,10 +37,13 @@ export class AuthController {
   async handleTruecallerCallback(
     @Body() callbackData: TruecallerCallbackDto,
     @Res({ passthrough: true }) res: Response,
+    @Req() req: Request
   ) {
     this.logger.log(
       `Received Truecaller callback for requestId: ${callbackData.requestId}`,
     );
+    // Log incoming headers (especially Content-Type)
+    this.logger.debug(`Truecaller Callback Headers: ${JSON.stringify(req.headers)}`);
     // Log the entire received body for debugging
     this.logger.debug(`Full Truecaller Callback Body: ${JSON.stringify(callbackData)}`);
 

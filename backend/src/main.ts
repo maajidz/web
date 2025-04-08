@@ -13,7 +13,8 @@ async function bootstrap() {
 
   // Pass logger config to NestFactory
   const app = await NestFactory.create(AppModule, {
-    logger: logLevels,
+    // FORCE DEBUG LOGGING TEMPORARILY
+    logger: ['log', 'debug', 'verbose', 'warn', 'error'],
   });
   const logger = new Logger('Bootstrap');
 
