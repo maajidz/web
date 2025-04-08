@@ -2,62 +2,59 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
-import { Logger, LogLevel } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
-  // Determine logging level based on environment
+  // --- Revert Logger Config ---
   const isProduction = process.env.NODE_ENV === 'production';
-  const logLevels: LogLevel[] = isProduction
-    ? ['warn', 'error'] // Production: Only warnings and errors
-    : ['log', 'debug', 'verbose', 'warn', 'error']; // Development: All levels
-
-  // Pass logger config to NestFactory
   const app = await NestFactory.create(AppModule, {
-    // FORCE DEBUG LOGGING TEMPORARILY
-    logger: ['log', 'debug', 'verbose', 'warn', 'error'],
+    logger: isProduction
+        ? ['warn', 'error']
+        : ['log', 'debug', 'verbose', 'warn', 'error'], // Dynamic levels
   });
-  const logger = new Logger('Bootstrap');
+  // ---------------------------
+  const logger = new Logger('Bootstrap'); // Keep NestJS logger
 
-  // --- Get underlying Express adapter and set trust proxy ---
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
-  // -------------------------------------------------------
 
   const configService = app.get(ConfigService);
 
   // Read origins from environment variable, split by comma, default to empty array
-  const allowedOrigins = (configService.get<string>('ALLOWED_ORIGINS') || '').split(',').filter(Boolean);
-  
-  // Log the loaded origins for debugging
-  console.log('Allowed CORS Origins:', allowedOrigins);
+  const allowedOrigins = (configService.get<string>('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map(origin => origin.trim()) // Trim whitespace
+    .filter(Boolean);
 
-  app.enableCors({
-    origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.length === 0) {
-          // If no origins are configured, potentially block all CORS requests or log a warning
-          console.warn('No ALLOWED_ORIGINS configured in .env file. Blocking CORS request from:', origin);
-          return callback(new Error('Not allowed by CORS'), false);
-      }
-      
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-        console.error(msg); // Log blocked origins
-        return callback(new Error('Not allowed by CORS'), false);
-      }
-      return callback(null, true);
-    },
-    credentials: true
-  });
+  console.log('Allowed CORS Origins:', allowedOrigins); // Keep console log for startup verification
+  logger.log(`Configuring CORS for origins: ${allowedOrigins.join(', ')}`);
+
+  if (allowedOrigins.length > 0) {
+      app.enableCors({
+          origin: allowedOrigins, // Use the array of allowed origins
+          methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+          allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+          credentials: true,
+          preflightContinue: false,
+          optionsSuccessStatus: 204
+      });
+      logger.log(`CORS enabled for specific origins.`);
+  } else {
+       logger.warn('No ALLOWED_ORIGINS defined. CORS might not allow frontend requests.');
+       // Optionally enable for all in development if needed, but risky
+       // if (!isProduction) {
+       //     app.enableCors({ origin: true, credentials: true });
+       //     logger.warn('Allowing all origins in non-production mode due to missing ALLOWED_ORIGINS.');
+       // }
+  }
+
 
   app.use(cookieParser());
-  
-  const port = configService.get<number>('PORT') || 3001;
+
+  const port = configService.get<number>('PORT') || 3001; // Vercel ignores this, but good practice
 
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`Application is running on: ${await app.getUrl()}`);
 }
 
 bootstrap(); 
