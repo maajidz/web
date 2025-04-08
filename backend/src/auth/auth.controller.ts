@@ -43,17 +43,9 @@ export class AuthController {
     this.logger.log(
       `Received Truecaller callback for requestId: ${callbackData.requestId ?? 'N/A'}`,
     );
-    // Log incoming headers (especially Content-Type)
     this.logger.debug(`Truecaller Callback Headers: ${JSON.stringify(req.headers)}`);
-    // Log the entire received body for debugging
     this.logger.debug(`Full Truecaller Callback Body: ${JSON.stringify(callbackData)}`);
 
-    if (callbackData.status === 'flow_invoked' && !callbackData.accessToken) {
-        this.logger.log("Truecaller flow invoked callback received, waiting for token callback.");
-        return;
-    }
-
-    // Get frontend URL from config
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || '';
     if (!frontendUrl) {
         this.logger.error('FRONTEND_URL environment variable is not set!');
@@ -62,6 +54,7 @@ export class AuthController {
 
     if (!callbackData.accessToken) {
         this.logger.error('Access Token missing in Truecaller callback payload');
+        this.logger.log(`Redirecting due to missing token: ${frontendUrl}/?error=CallbackTokenMissing`);
         res.redirect(`${frontendUrl}/?error=CallbackTokenMissing`);
         return;
     }
@@ -77,25 +70,30 @@ export class AuthController {
         res.cookie('auth-token', result.access_token, {
           httpOnly: true,
           secure: true,
-          sameSite: 'lax',
-          domain: '.flattr.io',
+          sameSite: 'none',
+          partitioned: true,
           maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
         });
         
+        this.logger.log(`Redirecting after successful Truecaller login: ${frontendUrl}/dashboard?login=success`);
         res.redirect(`${frontendUrl}/dashboard?login=success`);
       } else {
         this.logger.warn(
           `Verification failed: ${result.error}. RequestId: ${callbackData.requestId ?? 'N/A'}`,
         );
-        res.redirect(`${frontendUrl}/login?error=${result.error || 'TruecallerVerificationFailed'}`);
+        const redirectUrl = `${frontendUrl}/login?error=${result.error || 'TruecallerVerificationFailed'}`;
+        this.logger.log(`Redirecting after failed Truecaller verification: ${redirectUrl}`);
+        res.redirect(redirectUrl);
       }
     } catch (error: any) {
       this.logger.error(
         `Internal server error during Truecaller verification: ${error?.message || error}`,
         error?.stack,
       );
-      res.redirect(`${frontendUrl}/login?error=ServerError`);
+      const redirectUrl = `${frontendUrl}/login?error=ServerError`;
+      this.logger.log(`Redirecting after internal server error: ${redirectUrl}`);
+      res.redirect(redirectUrl);
     }
   }
 
@@ -119,8 +117,8 @@ export class AuthController {
         res.cookie('auth-token', result.access_token, {
           httpOnly: true,
           secure: true,
-          sameSite: 'lax',
-          domain: '.flattr.io',
+          sameSite: 'none',
+          partitioned: true,
           maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
         });
