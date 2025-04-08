@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import TruecallerSignup from '@/components/TruecallerSignup';
@@ -9,7 +9,8 @@ import TruecallerSignup from '@/components/TruecallerSignup';
 const TRUECALLER_PARTNER_KEY = process.env.NEXT_PUBLIC_TRUECALLER_PARTNER_KEY || "";
 const TRUECALLER_PARTNER_NAME = process.env.NEXT_PUBLIC_TRUECALLER_PARTNER_NAME || "";
 
-export default function Login() {
+// This component uses the searchParams hook which requires Suspense
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { checkAuthStatus, userId, isLoading } = useAuth();
@@ -85,6 +86,31 @@ export default function Login() {
           partnerKey={TRUECALLER_PARTNER_KEY}
           partnerName={TRUECALLER_PARTNER_NAME}
         />
+      </div>
+    </div>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function Login() {
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-base-100 p-4">
+      {/* Fallback loading UI for Suspense */}
+      <div className="w-full max-w-md">
+        <Suspense fallback={
+          <div className="p-6 bg-base-200 rounded-lg shadow-lg">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold mb-4">Flattr</h1>
+              <div className="flex justify-center">
+                <span className="loading loading-spinner text-primary"></span>
+              </div>
+              <p className="mt-4">Loading login page...</p>
+            </div>
+          </div>
+        }>
+          <LoginContent />
+        </Suspense>
       </div>
     </div>
   );
