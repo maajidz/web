@@ -2,10 +2,19 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
-import { Logger } from '@nestjs/common';
+import { Logger, LogLevel } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Determine logging level based on environment
+  const isProduction = process.env.NODE_ENV === 'production';
+  const logLevels: LogLevel[] = isProduction
+    ? ['warn', 'error'] // Production: Only warnings and errors
+    : ['log', 'debug', 'verbose', 'warn', 'error']; // Development: All levels
+
+  // Pass logger config to NestFactory
+  const app = await NestFactory.create(AppModule, {
+    logger: logLevels,
+  });
   const logger = new Logger('Bootstrap');
 
   // --- Get underlying Express adapter and set trust proxy ---

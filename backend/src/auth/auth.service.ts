@@ -17,7 +17,9 @@ export interface TruecallerProfile {
   firstName?: string;
   lastName?: string;
   phoneNumbers?: string[];
-  // Add other relevant fields like email, city, etc.
+  email?: string;
+  avatarUrl?: string;
+  // Add other relevant fields like city, etc.
 }
 
 // Interface for the user profile in your Supabase table
@@ -39,9 +41,9 @@ interface UserProfile {
 interface PhoneEmailPayload {
   user_country_code: string;
   user_phone_number: string;
-  // Add other fields if needed (e.g., first/last name)
-  // user_first_name?: string;
-  // user_last_name?: string;
+  // Add potentially available fields based on observation
+  user_first_name?: string;
+  user_last_name?: string;
 }
 
 @Injectable()
@@ -85,6 +87,9 @@ export class AuthService {
         return { success: false, error: 'TruecallerProfileMissingPhone' };
       }
 
+       // Log the full fetched profile for inspection
+       this.logger.debug(`Fetched Truecaller Profile: ${JSON.stringify(truecallerProfile)}`);
+
        // Standardize phone number: Remove leading '+', ensure it contains digits only
        // Assumes Truecaller provides the number including country code.
        const standardizedPhoneNumber = phoneNumberStr.replace(/\D/g, ''); // Remove non-digits (like +)
@@ -96,7 +101,9 @@ export class AuthService {
       return this.validateAndLoginUser(
         standardizedPhoneNumber, // Use standardized number
         truecallerProfile.firstName,
-        truecallerProfile.lastName
+        truecallerProfile.lastName,
+        truecallerProfile.email, // Pass email if available
+        truecallerProfile.avatarUrl // Pass avatarUrl if available (adjust field name if needed)
       );
 
     } catch (error: any) {
@@ -146,8 +153,17 @@ export class AuthService {
       const formattedPhoneNumber = `${phoneEmailData.user_country_code}${phoneEmailData.user_phone_number}`.replace(/^\+/, '');
       this.logger.log(`Phone.email verified phone number: ${formattedPhoneNumber}`);
 
+      // Log the full payload for inspection (useful for seeing if name is present)
+      this.logger.debug(`Fetched Phone.email Payload: ${JSON.stringify(phoneEmailData)}`);
+
       // 4. Check/Create user in Supabase & Generate Token (reuse logic)
-      return this.validateAndLoginUser(formattedPhoneNumber /*, optional first/last name if available */);
+      // Attempt to pass name fields if they exist in the payload
+      return this.validateAndLoginUser(
+          formattedPhoneNumber,
+          phoneEmailData.user_first_name, // Pass first name if available
+          phoneEmailData.user_last_name, // Pass last name if available
+          // Phone.email payload doesn't typically include email/pic
+       );
 
     } catch (error: any) {
        this.logger.error(
@@ -190,6 +206,8 @@ export class AuthService {
     // Optionally pass first/last name if available from verification source
     firstName?: string | null,
     lastName?: string | null,
+    email?: string | null, // Add email
+    profilePicUrl?: string | null // Add profile pic url
   ): Promise<{ success: boolean; userId?: string; access_token?: string; error?: string }> {
     this.logger.log(`Validating user for phone: ${phoneNumber}`);
       const supabase = this.supabaseService.supabaseAdmin;
@@ -222,6 +240,8 @@ export class AuthService {
             phone_number: phoneNumber,
             first_name: firstName || null,
             last_name: lastName || null,
+            email: email || null, // Add email to insert
+            profile_pic_url: profilePicUrl || null, // Add profile pic to insert
             // Set other defaults if needed
           })
           .select('id')
