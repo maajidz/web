@@ -65,17 +65,21 @@ export class AuthController {
       if (result.success && result.access_token) {
         this.logger.log(`Truecaller verification successful for user: ${result.userId}`);
         
+        // Set cookie for authentication
+        this.logger.log(`Setting auth cookie for user ${result.userId}`);
         res.cookie('auth-token', result.access_token, {
           httpOnly: true,
           secure: true,
           sameSite: 'lax',
-          domain: '.flattr.io',
+          domain: '.flattr.io', // Make sure this domain setting is appropriate for your environment
           maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
         });
         
-        this.logger.log(`Redirecting user ${result.userId} to dashboard.`);
-        res.redirect(`${frontendUrl}/dashboard`);
+        // Log redirect attempt
+        const redirectUrl = `${frontendUrl}/dashboard`;
+        this.logger.log(`Redirecting user ${result.userId} to: ${redirectUrl}`);
+        res.redirect(redirectUrl);
         return;
       } else {
         this.logger.warn(

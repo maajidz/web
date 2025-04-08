@@ -32,7 +32,7 @@ interface DbUserProfile {
   email?: string | null; // Assuming text/varchar, nullable
   profile_type?: string | null; // Assuming text/varchar or enum, nullable
   bio?: string | null; // Assuming text, nullable
-  profile_picture_url?: string | null; // Assuming text/varchar, nullable
+  avatar_url?: string | null; // Assuming text/varchar, nullable
   created_at: string; // Assuming timestamp string
   updated_at?: string | null; // Assuming timestamp string, nullable
 }
@@ -230,7 +230,7 @@ export class AuthService {
           if (firstName) updateData.first_name = firstName;
           if (lastName) updateData.last_name = lastName;
           if (email) updateData.email = email;
-          if (avatarUrl) updateData.profile_picture_url = avatarUrl;
+          if (avatarUrl) updateData.avatar_url = avatarUrl;
           
           // Update the user profile
           const { error: updateError } = await supabase
@@ -257,7 +257,7 @@ export class AuthService {
             first_name: firstName || null, // Use provided or null
             last_name: lastName || null,  // Use provided or null
             email: email || null,         // Use provided or null
-            profile_picture_url: avatarUrl || null // Assuming your column is named this
+            avatar_url: avatarUrl || null // Use avatar_url as the column name
             // ---- End using provided data ----
           })
           .select('id') // Select the ID of the newly inserted row
@@ -380,7 +380,7 @@ export class AuthService {
           first_name: firstName,
           last_name: lastName,
           // Only include profile picture if provided
-          ...(profilePictureUrl && { profile_picture_url: profilePictureUrl }),
+          ...(profilePictureUrl && { avatar_url: profilePictureUrl }),
           // We can also force updated_at if desired, but Supabase might handle it
       };
 
