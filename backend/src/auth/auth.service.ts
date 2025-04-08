@@ -4,12 +4,14 @@ import {
   HttpException,
   HttpStatus,
   UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { SupabaseService } from '../supabase/supabase.service'; // Adjust path if needed
 import { firstValueFrom, map, catchError } from 'rxjs';
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 import { JwtService } from '@nestjs/jwt'; // Import JwtService
+import { UserProfile } from './entities/user-profile.entity'; // Make sure you have this type/interface
 
 // Interface for the expected Truecaller profile structure
 // Adjust based on the actual data returned by their API
@@ -22,7 +24,7 @@ export interface TruecallerProfile {
 
 // Interface for the user profile in your Supabase table
 // Ensure this matches your 'user_profiles' schema
-interface UserProfile {
+interface DbUserProfile {
   id: string; // Assuming UUID or similar string ID
   phone_number: string; // Assuming text/varchar
   first_name?: string | null; // Assuming text/varchar, nullable
@@ -30,7 +32,7 @@ interface UserProfile {
   email?: string | null; // Assuming text/varchar, nullable
   profile_type?: string | null; // Assuming text/varchar or enum, nullable
   bio?: string | null; // Assuming text, nullable
-  profile_pic_url?: string | null; // Assuming text/varchar, nullable
+  profile_picture_url?: string | null; // Assuming text/varchar, nullable
   created_at: string; // Assuming timestamp string
   updated_at?: string | null; // Assuming timestamp string, nullable
 }
@@ -47,8 +49,6 @@ interface PhoneEmailPayload {
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly TRUECALLER_PROFILE_URL =
-    'https://profile4.truecaller.com/v1/default';
 
   constructor(
     private readonly httpService: HttpService,
@@ -59,64 +59,69 @@ export class AuthService {
   async verifyTruecallerUser(
     accessToken: string,
   ): Promise<{ success: boolean; userId?: string; access_token?: string; error?: string }> {
+    this.logger.log(`Fetching Truecaller profile for token: ${accessToken.substring(0, 10)}...`);
     try {
-      // 1. Fetch profile from Truecaller
-      this.logger.log(`Fetching Truecaller profile for token: ${accessToken.substring(0, 10)}...`);
-      const truecallerProfile = await this.fetchTruecallerProfile(accessToken);
+      // Fetch Truecaller profile
+      const response = await this.httpService.axiosRef.get<{
+          phoneNumbers: string[];
+          name?: { first?: string; last?: string };
+          onlineIdentities?: { email?: string };
+          avatarUrl?: string;
+          // Add other fields you might need from the Truecaller profile response
+        }>(
+        // Ensure you are using the correct profile endpoint provided in the callback if available,
+        // otherwise use the default one from config/docs if needed.
+        // For simplicity, using a placeholder URL here - REPLACE if needed.
+        'https://profile4-noneu.truecaller.com/v1/default',
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
+      );
 
-      if (!truecallerProfile) {
-        return { success: false, error: 'FailedToFetchTruecallerProfile' };
-      }
+      const truecallerProfile = response.data;
+      this.logger.debug(`Raw Truecaller profile data: ${JSON.stringify(truecallerProfile)}`); // Added debug log
 
-      // Extract primary phone number (assuming the first one is primary)
-      let phoneNumber: string | number | undefined | null = truecallerProfile.phoneNumbers?.[0];
-      let phoneNumberStr: string;
-
-      // Add check to ensure phoneNumber is a string or a number
-      if (typeof phoneNumber === 'number') {
-        phoneNumberStr = String(phoneNumber);
-      } else if (typeof phoneNumber === 'string' && phoneNumber.length > 0) {
-        phoneNumberStr = phoneNumber;
-      } else {
-        // Handle cases where it's null, undefined, empty string, or other type
-        this.logger.warn(
-            `Phone number missing or invalid type in Truecaller profile. Value: ${phoneNumber}, Profile data: ${JSON.stringify(truecallerProfile)}`
-        );
+      if (!truecallerProfile?.phoneNumbers?.[0]) {
+        this.logger.warn('Truecaller profile response missing phone number.');
         return { success: false, error: 'TruecallerProfileMissingPhone' };
       }
 
-       // Standardize phone number: Remove leading '+', ensure it contains digits only
-       // Assumes Truecaller provides the number including country code.
-       const standardizedPhoneNumber = phoneNumberStr.replace(/\D/g, ''); // Remove non-digits (like +)
+      const phoneNumberStr = truecallerProfile.phoneNumbers[0];
+      // Standardize phone number: Remove non-digits (like +)
+      const standardizedPhoneNumber = phoneNumberStr.replace(/\D/g, '');
 
       this.logger.log(`Truecaller profile fetched & standardized for phone: ${standardizedPhoneNumber}`);
 
-      // 2. Check if user exists in Supabase & Login/Create
-      // Use the refactored method
-      return this.validateAndLoginUser(
-        standardizedPhoneNumber, // Use standardized number
-        truecallerProfile.firstName,
-        truecallerProfile.lastName
+      // ---- Extract additional profile data ----
+      const firstName = truecallerProfile.name?.first;
+      const lastName = truecallerProfile.name?.last;
+      const email = truecallerProfile.onlineIdentities?.email;
+      const avatarUrl = truecallerProfile.avatarUrl;
+      // ---- End extraction ----
+
+      // Validate and login/signup user, passing the extra data
+      return await this.validateAndLoginUser(
+          standardizedPhoneNumber,
+          firstName, // Pass first name
+          lastName,  // Pass last name
+          email,     // Pass email
+          avatarUrl  // Pass avatar URL
       );
 
     } catch (error: any) {
-      this.logger.error(
-        `Error during Truecaller verification process: ${error?.message || error}`,
-        error?.stack,
-      );
-      // Check if it's an Axios error from Truecaller API call
-      if (error instanceof AxiosError) {
-        this.logger.error(
-          `Axios Error Status: ${error?.response?.status}, Data: ${
-            JSON.stringify(error?.response?.data)
-          }`,
-        );
-        if (error?.response?.status === 401) {
-          return { success: false, error: 'InvalidTruecallerToken' };
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const errorData = error.response?.data;
+        this.logger.error(`Failed to fetch Truecaller profile: Request failed with status code ${status}`, error.stack);
+        if (errorData) {
+            this.logger.error(JSON.stringify(errorData));
         }
-        return { success: false, error: 'TruecallerApiError' };
+        this.logger.error(`Axios Error Status: ${status}, Data: ${JSON.stringify(errorData)}`);
+        return { success: false, error: status === 401 ? 'InvalidTruecallerToken' : 'TruecallerApiError' };
+      } else {
+        this.logger.error(`Error during Truecaller verification process: ${error?.message || error}`, error.stack);
+        return { success: false, error: 'InternalServerError' };
       }
-      return { success: false, error: 'InternalServerError' };
     }
   }
 
@@ -187,32 +192,41 @@ export class AuthService {
   // --- Refactored User Validation & Login Logic ---
   private async validateAndLoginUser(
     phoneNumber: string,
-    // Optionally pass first/last name if available from verification source
+    // ---- Add optional parameters for extra data ----
     firstName?: string | null,
     lastName?: string | null,
+    email?: string | null,
+    avatarUrl?: string | null
+    // ---- End added parameters ----
   ): Promise<{ success: boolean; userId?: string; access_token?: string; error?: string }> {
     this.logger.log(`Validating user for phone: ${phoneNumber}`);
-      const supabase = this.supabaseService.supabaseAdmin;
+    const supabase = this.supabaseService.supabaseAdmin;
 
     try {
       // Check if user exists
       const { data: existingUser, error: fetchError } = await supabase
         .from('user_profiles')
-        .select('id')
+        .select('id') // Select only needed fields for check
         .eq('phone_number', phoneNumber)
-        .maybeSingle();
+        .maybeSingle(); // Allows 0 or 1 row
 
       if (fetchError) {
-        this.logger.error(`Supabase fetch error: ${fetchError.message}`, fetchError.stack);
+        this.logger.error(`Supabase error fetching user by phone: ${fetchError.message}`, fetchError.stack);
         return { success: false, error: 'DatabaseFetchError' };
       }
 
       let userIdToReturn: string | undefined;
       if (existingUser) {
         // User exists - Login
-        this.logger.log(`Existing user found: ${existingUser.id}`);
+        this.logger.log(`Existing user found: ${existingUser.id} for phone ${phoneNumber}`);
         userIdToReturn = existingUser.id;
-        // Potential future logic: Update name if verification source provides it?
+        // Optional: Update existing user's profile data if provided?
+        // Decide if Truecaller data should overwrite existing data on subsequent logins.
+        // Example (add if needed):
+        // await supabase.from('user_profiles').update({
+        //     first_name: firstName, last_name: lastName, email: email, profile_picture_url: avatarUrl
+        // }).eq('id', existingUser.id);
+
       } else {
         // User doesn't exist - Signup
         this.logger.log(`Creating new user profile for phone: ${phoneNumber}`);
@@ -220,66 +234,75 @@ export class AuthService {
           .from('user_profiles')
           .insert({
             phone_number: phoneNumber,
-            first_name: firstName || null,
-            last_name: lastName || null,
-            // Set other defaults if needed
+            // ---- Use the provided data ----
+            first_name: firstName || null, // Use provided or null
+            last_name: lastName || null,  // Use provided or null
+            email: email || null,         // Use provided or null
+            profile_picture_url: avatarUrl || null // Assuming your column is named this
+            // ---- End using provided data ----
           })
-          .select('id')
-          .single();
+          .select('id') // Select the ID of the newly inserted row
+          .single(); // Expects insert to return the new row
 
         if (insertError) {
-          this.logger.error(`Supabase insert error: ${insertError.message}`, insertError.stack);
+          this.logger.error(`Supabase error inserting new user: ${insertError.message}`, insertError.stack);
           return { success: false, error: 'DatabaseInsertError' };
+        }
+
+        if (!newUser || !newUser.id) {
+             this.logger.error('Supabase insert operation did not return the new user ID.');
+             return { success: false, error: 'DatabaseInsertError' };
         }
 
         this.logger.log(`New user created: ${newUser.id}`);
         userIdToReturn = newUser.id;
       }
-      
+
       // Generate JWT
       if (userIdToReturn) {
-          const payload = { sub: userIdToReturn };
-          const generatedToken = await this.jwtService.signAsync(payload);
-          this.logger.log(`JWT generated successfully for user: ${userIdToReturn}`);
-          return { success: true, userId: userIdToReturn, access_token: generatedToken };
+        const payload = { sub: userIdToReturn };
+        const generatedToken = await this.jwtService.signAsync(payload);
+        this.logger.log(`JWT generated successfully for user: ${userIdToReturn}`);
+        return { success: true, userId: userIdToReturn, access_token: generatedToken };
       } else {
-          this.logger.error('User ID was not determined after validation/creation.');
-          return { success: false, error: 'UserIdResolutionFailed' };
+        // Should not happen if logic above is correct, but handle defensively
+         this.logger.error('User ID was unexpectedly undefined before JWT generation.');
+         return { success: false, error: 'UserCreationFailed' };
       }
 
     } catch (error: any) {
-       this.logger.error(`Error during user validation/login for phone ${phoneNumber}: ${error?.message || error}`, error?.stack);
+      this.logger.error(`Unexpected error during user validation/login for phone ${phoneNumber}: ${error?.message || error}`, error.stack);
       return { success: false, error: 'InternalServerError' };
     }
   }
 
   // --- Original Truecaller Fetch Helper ---
-  private async fetchTruecallerProfile(
-    accessToken: string,
-  ): Promise<TruecallerProfile | null> {
-    try {
-      const response = await firstValueFrom(
-        this.httpService
-          .get<TruecallerProfile>(this.TRUECALLER_PROFILE_URL, {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          })
-          .pipe(map((res: { data: TruecallerProfile }) => res.data)),
-      );
-      return response;
-    } catch (error: any) {
-      this.logger.error(
-        `Failed to fetch Truecaller profile: ${error?.message || error}`,
-        error instanceof AxiosError ? error?.response?.data : error?.stack,
-      );
-      // Rethrow to be caught by the main handler, preserving specific errors if needed
-      throw error;
-    }
-  }
+  // private async fetchTruecallerProfile(
+  //   accessToken: string,
+  // ): Promise<TruecallerProfile | null> {
+  //   try {
+  //     const response = await firstValueFrom(
+  //       this.httpService
+  //         .get<TruecallerProfile>(this.fetchPhoneEmailData, {
+  //           headers: {
+  //             Authorization: `Bearer ${accessToken}`,
+  //           },
+  //         })
+  //         .pipe(map((res: { data: TruecallerProfile }) => res.data)),
+  //     );
+  //     return response;
+  //   } catch (error: any) {
+  //     this.logger.error(
+  //       `Failed to fetch Truecaller profile: ${error?.message || error}`,
+  //       error instanceof AxiosError ? error?.response?.data : error?.stack,
+  //     );
+  //     // Rethrow to be caught by the main handler, preserving specific errors if needed
+  //     throw error;
+  //   }
+  // }
 
   // --- Get Profile Method (Added back for /profile endpoint) ---
-  async getUserProfile(userId: string): Promise<UserProfile | null> {
+  async getUserProfile(userId: string): Promise<DbUserProfile | null> {
     this.logger.log(`Fetching profile for user ID: ${userId}`);
     const supabase = this.supabaseService.supabaseAdmin;
     try {
@@ -305,7 +328,7 @@ export class AuthService {
       }
       
       this.logger.log(`Profile fetched successfully for user ID: ${userId}`);
-      return data as UserProfile;
+      return data as DbUserProfile;
     } catch (error: unknown) { // Explicitly type error as unknown
       if (error instanceof HttpException) throw error; // Re-throw known HTTP exceptions
 
@@ -323,4 +346,62 @@ export class AuthService {
       throw new HttpException('An unexpected error occurred', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+
+  // +++ NEW Method to Update User Profile +++
+  async updateUserProfile(
+      userId: string,
+      firstName: string,
+      lastName: string | null,
+      profilePictureUrl?: string | null
+  ): Promise<DbUserProfile> { // Return updated profile
+      this.logger.log(`Updating profile for user ID: ${userId}`);
+      const supabase = this.supabaseService.supabaseAdmin;
+
+      const updateData: Partial<DbUserProfile> = {
+          first_name: firstName,
+          last_name: lastName,
+          // Only include profile picture if provided
+          ...(profilePictureUrl && { profile_picture_url: profilePictureUrl }),
+          // We can also force updated_at if desired, but Supabase might handle it
+      };
+
+      try {
+          const { data, error } = await supabase
+              .from('user_profiles')
+              .update(updateData)
+              .eq('id', userId)
+              .select() // Select the updated row
+              .single(); // Expect one row to be updated
+
+          if (error) {
+              if (error.code === 'PGRST116') { // Should not happen if user exists but handle defensively
+                  this.logger.error(`Failed to update: No profile found for user ID: ${userId} during update.`, error.stack);
+                   throw new NotFoundException(`Profile not found for user ID ${userId}`);
+              } else {
+                  this.logger.error(`Supabase error updating profile for user ${userId}: ${error.message}`, error.stack);
+                  throw new HttpException('Failed to update profile', HttpStatus.INTERNAL_SERVER_ERROR);
+              }
+          }
+
+           if (!data) {
+              this.logger.error(`Supabase update operation did not return data for user ID: ${userId}.`);
+              throw new HttpException('Failed to confirm profile update', HttpStatus.INTERNAL_SERVER_ERROR);
+           }
+
+          this.logger.log(`Profile updated successfully for user ID: ${userId}`);
+          return data as DbUserProfile; // Return the updated profile data
+      } catch (error: unknown) {
+          if (error instanceof HttpException) throw error; // Re-throw known HTTP exceptions
+
+          let errorMessage = 'Unknown error during profile update';
+          if (error instanceof Error) {
+              errorMessage = error.message;
+          } else if (typeof error === 'string') {
+              errorMessage = error;
+          }
+           this.logger.error(`Unexpected error updating profile for user ${userId}: ${errorMessage}`, error instanceof Error ? error.stack : 'Unknown stack');
+           throw new HttpException('An unexpected error occurred during profile update', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+  }
+  // +++ End NEW Method +++
 } 

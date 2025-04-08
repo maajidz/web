@@ -10,12 +10,15 @@ import {
   UseGuards,
   Request as Req,
   HttpException,
+  Patch,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Response, Request } from 'express';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { PhoneEmailVerifyDto } from './dto/phone-email-verify.dto';
 import { ConfigService } from '@nestjs/config';
+import { CompleteProfileDto } from './dto/complete-profile.dto';
 
 // DTO for expected callback body (adjust if needed based on actual Truecaller payload)
 class TruecallerCallbackDto {
@@ -33,7 +36,7 @@ export class AuthController {
     private readonly configService: ConfigService
   ) {}
 
-  @Post('true-sdk') // Matches your specified callback URL path
+  @Post('true-sdk')
   async handleTruecallerCallback(
     @Body() callbackData: TruecallerCallbackDto,
     @Res({ passthrough: true }) res: Response,
@@ -42,18 +45,16 @@ export class AuthController {
       `Received Truecaller callback for requestId: ${callbackData.requestId}`,
     );
 
-    // Get frontend URL from config
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || '';
     if (!frontendUrl) {
         this.logger.error('FRONTEND_URL environment variable is not set!');
-        // Handle error appropriately, maybe redirect to a generic error page or return 500
         throw new HttpException('Server configuration error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     if (!callbackData.accessToken) {
         this.logger.error('Access Token missing in Truecaller callback');
-        // Redirect back to frontend with error
-        return res.redirect(`${frontendUrl}/?error=CallbackTokenMissing`);
+        res.redirect(`${frontendUrl}/login?error=CallbackTokenMissing`);
+        return;
     }
 
     try {
@@ -64,24 +65,22 @@ export class AuthController {
       if (result.success && result.access_token) {
         this.logger.log(`Truecaller verification successful for user: ${result.userId}`);
         
-        // Set JWT in HttpOnly cookie
-        const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('auth-token', result.access_token, {
           httpOnly: true,
           secure: true,
           sameSite: 'lax',
-          partitioned: true,
+          domain: '.flattr.io',
           maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
         });
         
-        // Redirect user back to the frontend dashboard (or a success page)
-        res.redirect(`${frontendUrl}/dashboard?login=success`);
+        this.logger.log(`Redirecting user ${result.userId} to dashboard.`);
+        res.redirect(`${frontendUrl}/dashboard`);
+        return;
       } else {
         this.logger.warn(
           `Verification failed: ${result.error}. RequestId: ${callbackData.requestId}`,
         );
-        // Redirect back to frontend with specific error using configured URL
         res.redirect(`${frontendUrl}/login?error=${result.error || 'TruecallerVerificationFailed'}`);
       }
     } catch (error: any) {
@@ -89,7 +88,6 @@ export class AuthController {
         `Internal server error during Truecaller verification: ${error?.message || error}`,
         error?.stack,
       );
-      // Redirect back to frontend with a generic server error using configured URL
       res.redirect(`${frontendUrl}/login?error=ServerError`);
     }
   }
@@ -117,7 +115,7 @@ export class AuthController {
           httpOnly: true,
           secure: true,
           sameSite: 'lax',
-          // partitioned: true,
+          domain: '.flattr.io',
           maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
         });
@@ -165,6 +163,46 @@ export class AuthController {
     }
     return userProfile;
   }
+
+  // +++ NEW Endpoint to Complete Profile +++
+  @UseGuards(JwtAuthGuard) // Protect this route
+  @Patch('profile/complete') // Use PATCH for updates
+  async completeProfile(
+    @Req() req: Request, // Get user from JWT
+    @Body() completeProfileDto: CompleteProfileDto, // Use DTO for validation
+  ) {
+      const userId = req.user?.sub; // Get userId from JWT payload
+      if (!userId) {
+          // Should not happen if JwtAuthGuard passes, but handle defensively
+          throw new UnauthorizedException('User ID not found in token');
+      }
+      this.logger.log(`Completing profile for user ID: ${userId}`);
+
+      // Basic parsing of full name
+      const nameParts = completeProfileDto.fullName.trim().split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null; // Handle names with multiple parts
+
+      try {
+          // Call the service method to update the profile
+          const updatedProfile = await this.authService.updateUserProfile(
+              userId,
+              firstName,
+              lastName,
+              completeProfileDto.profilePictureUrl // Pass optional picture URL
+          );
+          this.logger.log(`Profile completed successfully for user: ${userId}`);
+          return updatedProfile; // Return the updated profile data
+      } catch (error) {
+          // Log error already happens in service, rethrow HTTP exceptions
+           if (error instanceof HttpException) {
+              throw error;
+           }
+          // Fallback for unexpected errors
+           throw new HttpException('Failed to complete profile', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+  }
+  // +++ End NEW Endpoint +++
 
   // Optional: Add a logout route
   @Post('logout')
