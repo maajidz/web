@@ -221,12 +221,30 @@ export class AuthService {
         // User exists - Login
         this.logger.log(`Existing user found: ${existingUser.id} for phone ${phoneNumber}`);
         userIdToReturn = existingUser.id;
-        // Optional: Update existing user's profile data if provided?
-        // Decide if Truecaller data should overwrite existing data on subsequent logins.
-        // Example (add if needed):
-        // await supabase.from('user_profiles').update({
-        //     first_name: firstName, last_name: lastName, email: email, profile_picture_url: avatarUrl
-        // }).eq('id', existingUser.id);
+        // Update existing user's profile data if provided
+        if (firstName || lastName || email || avatarUrl) {
+          this.logger.log(`Updating profile data for existing user: ${existingUser.id}`);
+          const updateData: any = {};
+          
+          // Only include fields that are provided
+          if (firstName) updateData.first_name = firstName;
+          if (lastName) updateData.last_name = lastName;
+          if (email) updateData.email = email;
+          if (avatarUrl) updateData.profile_picture_url = avatarUrl;
+          
+          // Update the user profile
+          const { error: updateError } = await supabase
+            .from('user_profiles')
+            .update(updateData)
+            .eq('id', existingUser.id);
+            
+          if (updateError) {
+            this.logger.warn(`Could not update profile for user ${existingUser.id}: ${updateError.message}`);
+            // Continue with login even if update fails
+          } else {
+            this.logger.log(`Profile updated successfully for user: ${existingUser.id}`);
+          }
+        }
 
       } else {
         // User doesn't exist - Signup
