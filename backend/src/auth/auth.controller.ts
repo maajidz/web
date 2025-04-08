@@ -41,6 +41,8 @@ export class AuthController {
     this.logger.log(
       `Received Truecaller callback for requestId: ${callbackData.requestId}`,
     );
+    // Log the entire received body for debugging
+    this.logger.debug(`Full Truecaller Callback Body: ${JSON.stringify(callbackData)}`);
 
     // Get frontend URL from config
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || '';
