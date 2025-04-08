@@ -86,7 +86,8 @@ export class AuthService {
         return { success: false, error: 'TruecallerProfileMissingPhone' };
       }
 
-      const phoneNumberStr = truecallerProfile.phoneNumbers[0];
+      // Convert the phone number to a string first before using string methods
+      const phoneNumberStr = String(truecallerProfile.phoneNumbers[0]);
       // Standardize phone number: Remove non-digits (like +)
       const standardizedPhoneNumber = phoneNumberStr.replace(/\D/g, '');
 
