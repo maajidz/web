@@ -97,7 +97,11 @@ export class AuthService {
       const firstName = truecallerProfile.name?.first;
       const lastName = truecallerProfile.name?.last;
       const email = truecallerProfile.onlineIdentities?.email;
-      const avatarUrl = truecallerProfile.avatarUrl;
+      // Default fallback avatar if user doesn't have a profile picture
+      const defaultAvatarUrl = 'https://ui-avatars.com/api/?name=' + encodeURIComponent((truecallerProfile.name?.first || '') + '+' + (truecallerProfile.name?.last || '')) + '&background=random&color=fff';
+      
+      // Use the Truecaller avatarUrl if available, otherwise use the default avatar
+      const avatarUrl = truecallerProfile.avatarUrl || defaultAvatarUrl;
       // ---- End extraction ----
 
       // Validate and login/signup user, passing the extra data

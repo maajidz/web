@@ -19,4 +19,11 @@ Thumbs.db
 
 # IDE files
 .vscode/
-.idea/ 
+.idea/
+
+# Supabase
+supabase/
+!supabase/migrations/
+
+# Always track backend migrations
+!backend/migrations/
