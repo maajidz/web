@@ -22,24 +22,10 @@ async function bootstrap() {
   console.log('Allowed CORS Origins:', allowedOrigins);
 
   app.enableCors({
-    origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.length === 0) {
-          // If no origins are configured, potentially block all CORS requests or log a warning
-          console.warn('No ALLOWED_ORIGINS configured in .env file. Blocking CORS request from:', origin);
-          return callback(new Error('Not allowed by CORS'), false);
-      }
-      
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-        console.error(msg); // Log blocked origins
-        return callback(new Error('Not allowed by CORS'), false);
-      }
-      return callback(null, true);
-    },
-    credentials: true
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   });
 
   app.use(cookieParser());

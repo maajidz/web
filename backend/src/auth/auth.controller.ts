@@ -19,13 +19,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { PhoneEmailVerifyDto } from './dto/phone-email-verify.dto';
 import { ConfigService } from '@nestjs/config';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
-
-// DTO for expected callback body (adjust if needed based on actual Truecaller payload)
-class TruecallerCallbackDto {
-  requestId: string = '';
-  accessToken: string = '';
-  // Add other potential fields if Truecaller sends them
-}
+import { TruecallerCallbackDto } from './dto/truecaller-callback.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -39,67 +33,83 @@ export class AuthController {
   @Post('true-sdk')
   async handleTruecallerCallback(
     @Body() callbackData: TruecallerCallbackDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    this.logger.log(
-      `Received Truecaller callback for requestId: ${callbackData.requestId}`,
-    );
-
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || '';
-    if (!frontendUrl) {
-        this.logger.error('FRONTEND_URL environment variable is not set!');
-        throw new HttpException('Server configuration error', HttpStatus.INTERNAL_SERVER_ERROR);
+    this.logger.log('Received Truecaller callback with data:');
+    this.logger.log(JSON.stringify(callbackData));
+    this.logger.log(`Received Truecaller callback for requestId: ${callbackData.requestId}`);
+    
+    this.logger.debug('Full request body:', JSON.stringify(req.body));
+    this.logger.debug('Request headers:', JSON.stringify(req.headers));
+    
+    // Determine frontend URL: Prioritize x-forwarded-host if behind proxy, then origin/referer, then env var
+    const xForwardedHost = req.headers['x-forwarded-host'] as string;
+    let derivedFrontendUrl: string | undefined;
+    if (xForwardedHost) {
+        // Ensure it uses https if x-forwarded-proto is set, or assume https for common proxy setups
+        const proto = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+        derivedFrontendUrl = `${proto}://${xForwardedHost}`;
     }
-
-    if (!callbackData.accessToken) {
-        this.logger.error('Access Token missing in Truecaller callback');
-        res.redirect(`${frontendUrl}/login?error=CallbackTokenMissing`);
-        return;
+    const frontendUrl = derivedFrontendUrl || req.headers.origin || req.headers.referer || this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    this.logger.log(`Using frontend URL for redirect: ${frontendUrl}`);
+    
+    if (callbackData.status && callbackData.status === 'flow_invoked') { 
+      this.logger.log('Received initial flow_invoked callback - waiting for second callback with token');
+      // For the first callback, just return OK status, no redirect needed.
+      res.status(HttpStatus.OK).send({ status: 'ok', message: 'Flow invoked callback received' });
+      return; // Explicitly return here to prevent further processing
     }
-
+    
     try {
-      const result = await this.authService.verifyTruecallerUser(
-        callbackData.accessToken,
-      );
+      this.logger.log(`Processing Truecaller callback for token access`);
+      const result = await this.authService.verifyTruecallerUser(callbackData);
+      this.logger.log(`Truecaller verification successful for user: ${result.userId}`);
+      
+      const cookieDomain = this.getCookieDomain(req);
+      const cookieOptions = {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none' as const,
+        domain: cookieDomain, // Use dynamic domain
+        partitioned: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/',
+      };
+      
+      this.logger.log(`Setting auth cookie for user ${result.userId}`);
+      this.logger.debug(`Setting auth cookie with options: ${JSON.stringify(cookieOptions)}`);
+      
+      res.cookie('auth-token', result.access_token, cookieOptions);
+      
+      const redirectUrl = `${frontendUrl}/dashboard?user_id=${result.userId}&auth_success=true`;
+      this.logger.log(`Redirecting user ${result.userId} to: ${redirectUrl}`);
+      res.redirect(redirectUrl);
+      // DO NOT return anything here, as res.redirect() handles the response.
 
-      if (result.success && result.access_token) {
-        this.logger.log(`Truecaller verification successful for user: ${result.userId}`);
-        
-        // Set cookie for authentication
-        this.logger.log(`Setting auth cookie for user ${result.userId}`);
-        res.cookie('auth-token', result.access_token, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'lax',
-          domain: '.flattr.io', // Make sure this domain setting is appropriate for your environment
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-          path: '/',
-        });
-        
-        // For browser-based flow (mobile web), we'll use a special success parameter 
-        // that the frontend can detect, rather than a server-side redirect
-        const redirectUrl = `${frontendUrl}/login?auth_success=true&user_id=${result.userId}`;
-        this.logger.log(`Redirecting user ${result.userId} to: ${redirectUrl} with success parameter`);
-        res.redirect(redirectUrl);
-        return;
-      } else {
-        this.logger.warn(
-          `Verification failed: ${result.error}. RequestId: ${callbackData.requestId}`,
-        );
-        res.redirect(`${frontendUrl}/login?error=${result.error || 'TruecallerVerificationFailed'}`);
+    } catch (error: unknown) {
+      // ... (keep existing error handling and redirect logic) ...
+      let errorMessage = 'Unknown error processing Truecaller callback';
+      let errorStack: string | undefined = undefined;
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        errorStack = error.stack;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
       }
-    } catch (error: any) {
-      this.logger.error(
-        `Internal server error during Truecaller verification: ${error?.message || error}`,
-        error?.stack,
-      );
-      res.redirect(`${frontendUrl}/login?error=ServerError`);
+      this.logger.error(errorMessage, errorStack);
+      
+      // Redirect with error
+      const errorRedirectUrl = `${frontendUrl}?error=TC_FAILED`;
+      this.logger.error(`Redirecting on error to: ${errorRedirectUrl}`);
+      res.redirect(errorRedirectUrl);
     }
   }
 
   @Post('phone-email/verify')
   async verifyPhoneEmail(
     @Body() phoneEmailVerifyDto: PhoneEmailVerifyDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     this.logger.log(
@@ -111,19 +121,23 @@ export class AuthController {
         phoneEmailVerifyDto.user_json_url,
       );
 
-      if (result.success && result.access_token) {
+      if (result.success && result.access_token && result.userId) { // Check userId too
         this.logger.log(`Phone.email verification successful for user: ${result.userId}`);
 
         // Set JWT in HttpOnly cookie (same as Truecaller)
-        const isProduction = process.env.NODE_ENV === 'production';
-        res.cookie('auth-token', result.access_token, {
+        const cookieDomain = this.getCookieDomain(req);
+        const cookieOptions = {
           httpOnly: true,
           secure: true,
-          sameSite: 'lax',
-          domain: '.flattr.io',
+          sameSite: 'none' as const,
+          domain: cookieDomain,
+          partitioned: true,
           maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
-        });
+        };
+        
+        this.logger.debug(`Setting auth cookie with options: ${JSON.stringify(cookieOptions)}`);
+        res.cookie('auth-token', result.access_token, cookieOptions);
 
         // Send success response (no redirect needed as this is called via fetch)
         return { success: true, userId: result.userId };
@@ -137,15 +151,23 @@ export class AuthController {
           HttpStatus.BAD_REQUEST, // Or potentially UNAUTHORIZED depending on error
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) { // Catch unknown errors
         // Handle errors thrown from the service or the HttpException above
         if (error instanceof HttpException) {
            throw error; // Re-throw known HTTP exceptions
         }
-      this.logger.error(
-        `Internal server error during Phone.email verification: ${error?.message || error}`,
-        error?.stack,
-      );
+        
+        let errorMessage = 'Internal server error during Phone.email verification';
+        let errorStack: string | undefined = undefined;
+        if (error instanceof Error) {
+          errorMessage = error.message;
+          errorStack = error.stack;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+        
+        this.logger.error(errorMessage, errorStack);
+        
        throw new HttpException(
          'InternalServerError',
          HttpStatus.INTERNAL_SERVER_ERROR,
@@ -153,15 +175,13 @@ export class AuthController {
     }
   }
 
-  // New protected route
-  @UseGuards(JwtAuthGuard) // Apply the guard
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
-  async getProfile(@Req() req: Request) { // Access the extended Request object
+  async getProfile(@Req() req: Request) { 
     this.logger.log(`Fetching profile for user: ${req.user?.sub}`);
     if (!req.user?.sub) {
       throw new HttpException('User ID not found in token', HttpStatus.UNAUTHORIZED);
     }
-    // Fetch the full profile using the service method
     const userProfile = await this.authService.getUserProfile(req.user.sub);
     if (!userProfile) {
       throw new HttpException('Profile not found', HttpStatus.NOT_FOUND);
@@ -169,58 +189,96 @@ export class AuthController {
     return userProfile;
   }
 
-  // +++ NEW Endpoint to Complete Profile +++
-  @UseGuards(JwtAuthGuard) // Protect this route
-  @Patch('profile/complete') // Use PATCH for updates
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile/complete') 
   async completeProfile(
-    @Req() req: Request, // Get user from JWT
-    @Body() completeProfileDto: CompleteProfileDto, // Use DTO for validation
+    @Req() req: Request,
+    @Body() completeProfileDto: CompleteProfileDto, 
   ) {
-      const userId = req.user?.sub; // Get userId from JWT payload
+      const userId = req.user?.sub;
       if (!userId) {
-          // Should not happen if JwtAuthGuard passes, but handle defensively
           throw new UnauthorizedException('User ID not found in token');
       }
       this.logger.log(`Completing profile for user ID: ${userId}`);
 
-      // Basic parsing of full name
       const nameParts = completeProfileDto.fullName.trim().split(' ');
       const firstName = nameParts[0];
-      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null; // Handle names with multiple parts
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
 
       try {
-          // Call the service method to update the profile
           const updatedProfile = await this.authService.updateUserProfile(
               userId,
               firstName,
               lastName,
-              completeProfileDto.profilePictureUrl // Pass optional picture URL
+              completeProfileDto.profilePictureUrl
           );
           this.logger.log(`Profile completed successfully for user: ${userId}`);
-          return updatedProfile; // Return the updated profile data
-      } catch (error) {
-          // Log error already happens in service, rethrow HTTP exceptions
+          return updatedProfile;
+      } catch (error: unknown) {
            if (error instanceof HttpException) {
               throw error;
            }
-          // Fallback for unexpected errors
-           throw new HttpException('Failed to complete profile', HttpStatus.INTERNAL_SERVER_ERROR);
+          let errorMessage = 'Failed to complete profile';
+          if (error instanceof Error) errorMessage = error.message;
+          else if (typeof error === 'string') errorMessage = error;
+           
+           throw new HttpException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
       }
   }
-  // +++ End NEW Endpoint +++
 
-  // Optional: Add a logout route
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
+  logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     this.logger.log('Logging out user');
-    res.clearCookie('auth-token', { path: '/' }); // Clear the auth cookie
+    const cookieDomain = this.getCookieDomain(req);
+    const cookieOptions = { 
+      path: '/',
+      domain: cookieDomain,
+      secure: true,
+      httpOnly: true,
+      sameSite: 'none' as const,
+      partitioned: true
+    };
+    this.logger.debug(`Clearing auth cookie with options: ${JSON.stringify(cookieOptions)}`);
+    res.clearCookie('auth-token', cookieOptions);
     return { message: 'Logged out successfully' };
   }
 
-  // --- Simple Diagnostic Route ---
   @Get('ping')
   ping(): string {
       this.logger.log('Received ping request');
       return 'pong';
+  }
+
+  private getCookieDomain(req: Request): string | undefined {
+    const host = req.headers.host || '';
+    this.logger.debug(`Determining cookie domain for host: ${host}`);
+    
+    // For localhost or IP address
+    if (host.includes('localhost') || /^\d+\.\d+\.\d+\.\d+/.test(host.split(':')[0])) { // Check only the host part before port
+      this.logger.debug('Host is localhost or IP, returning undefined domain.');
+      return undefined;
+    }
+    
+    // For Ngrok domains - return undefined to use the current host
+    if (host.includes('ngrok-free.app') || host.includes('ngrok.io')) {
+        this.logger.debug(`Host is Ngrok, returning undefined domain.`);
+        return undefined;
+    }
+    
+    // For Pinggy.io domains - return undefined to use the current host
+    if (host.includes('.free.pinggy.link')) {
+      this.logger.debug(`Host is Pinggy.io, returning undefined domain.`);
+      return undefined;
+    }
+    
+    // For production domain
+    if (host.includes('flattr.io')) {
+      this.logger.debug('Host is flattr.io, returning domain: .flattr.io');
+      return '.flattr.io'; // Note the leading dot for subdomains
+    }
+    
+    // Default: don't set domain
+    this.logger.debug('Host does not match known patterns, returning undefined domain.');
+    return undefined;
   }
 } 

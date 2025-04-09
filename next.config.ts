@@ -10,8 +10,18 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [{ hostname: 'public.readdy.ai' }],
   },
-  // Allow connections from specific origins during development for HMR
-  allowedDevOrigins: allowedDevOriginsArray.length > 0 ? allowedDevOriginsArray : undefined,
+  // Move allowedDevOrigins to the correct location
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      // Only apply in development and for client-side
+      config.devServer = {
+        ...config.devServer,
+        // Allow connections from specific origins for HMR
+        allowedHosts: allowedDevOriginsArray,
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

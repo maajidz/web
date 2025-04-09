@@ -153,10 +153,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
 
   // --- Truecaller Deep Link Flow Handler ---
   const handleTruecallerSignUp = () => {
+    console.log('[DEBUG] Starting Truecaller signup flow');
     setAuthError(null);
     setAuthState(AuthProcessState.TruecallerLoading);
 
     const requestNonce = generateNonce();
+    console.log('[DEBUG] Generated nonce:', requestNonce);
+    
     const lang = 'en';
     const privacyUrl = encodeURIComponent(process.env.NEXT_PUBLIC_PRIVACY_URL || 'https://flattr.io/privacy');
     const termsUrl = encodeURIComponent(process.env.NEXT_PUBLIC_TERMS_URL || 'https://flattr.io/terms');
@@ -171,30 +174,63 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
       termsUrl: termsUrl,
     });
 
-    const deepLinkUrl = `truecallersdk://truesdk/web_verify?${deepLinkParams.toString().replace(/&/g, '&')}`;
-    console.log('Attempting Truecaller Deep Link (Android):', deepLinkUrl);
+    const deepLinkUrl = `truecallersdk://truesdk/web_verify?${deepLinkParams.toString()}`;
+    console.log('[DEBUG] Truecaller deep link URL:', deepLinkUrl);
 
     try {
+      // Store the nonce in sessionStorage to verify it later
+      sessionStorage.setItem('truecaller_nonce', requestNonce);
+      console.log('[DEBUG] Stored nonce in sessionStorage');
+      
       window.location.href = deepLinkUrl;
-
+      console.log('[DEBUG] Navigated to Truecaller deep link');
+      
+      // Add a timeout to check if we're still on the page after some time
       setTimeout(() => {
         if (document.hasFocus()) {
-          console.warn('Truecaller deep link failed or app not installed. Falling back to Phone.email');
-          // *** REFINEMENT: Fallback to Phone.email instead of just resetting ***
-          setAuthError("Truecaller verification failed. Please verify using your phone number."); // Inform user
-          setAuthState(AuthProcessState.PhoneEmailTriggered); // Trigger Phone.email flow
+          console.log('[DEBUG] Page still has focus after timeout - likely no Truecaller app or authentication failed');
         } else {
-          console.log('Truecaller dialog likely opened. Waiting for backend callback.');
-          // Remain in TruecallerLoading state
+          console.log('[DEBUG] Page lost focus - Truecaller app likely opened');
         }
-      }, 800);
+      }, 1500);
     } catch (err) {
-      console.error("Error attempting Truecaller deep link:", err);
+      console.error('[DEBUG] Error in Truecaller deep link navigation:', err);
       setAuthError("Could not start Truecaller verification. Trying phone number verification.");
-      // Fallback to Phone.email on immediate error too
       setAuthState(AuthProcessState.PhoneEmailTriggered);
     }
   };
+
+  // Add focus listener in useEffect to debug focus events
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('[DEBUG] Window regained focus');
+      if (authState === AuthProcessState.TruecallerLoading) {
+        console.log('[DEBUG] Window regained focus while in TruecallerLoading state');
+        
+        // Check if we have the nonce in storage
+        const storedNonce = sessionStorage.getItem('truecaller_nonce');
+        console.log('[DEBUG] Stored nonce from session:', storedNonce);
+        
+        // We don't want to reset state here yet - let's just log for debugging
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[DEBUG] Document became visible again');
+      } else {
+        console.log('[DEBUG] Document visibility changed to:', document.visibilityState);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [authState]);
 
   // --- Main Login Click Handler ---
   const handleLoginClick = () => {
