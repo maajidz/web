@@ -12,6 +12,7 @@ import {
   HttpException,
   Patch,
   UnauthorizedException,
+  Inject,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Response, Request } from 'express';
@@ -20,6 +21,8 @@ import { PhoneEmailVerifyDto } from './dto/phone-email-verify.dto';
 import { ConfigService } from '@nestjs/config';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { TruecallerCallbackDto } from './dto/truecaller-callback.dto';
+import { CacheModule, CacheInterceptor, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Controller('auth')
 export class AuthController {
@@ -27,7 +30,8 @@ export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache
   ) {}
 
   @Post('true-sdk')
@@ -42,6 +46,17 @@ export class AuthController {
     
     this.logger.debug('Full request body:', JSON.stringify(req.body));
     this.logger.debug('Request headers:', JSON.stringify(req.headers));
+    
+    // --- Check if request ID was recently processed ---
+    const processedKey = `truecaller_processed_${callbackData.requestId}`;
+    const alreadyProcessed = await this.cacheManager.get(processedKey);
+    if (alreadyProcessed) {
+        this.logger.warn(`Duplicate Truecaller callback received for already processed requestId: ${callbackData.requestId}. Ignoring.`);
+        // Send a simple OK to prevent client errors, but don't re-process
+        res.status(HttpStatus.OK).send({ status: 'ok', message: 'Duplicate request ignored' });
+        return;
+    }
+    // --- End Check ---
     
     // Determine frontend URL: Prioritize x-forwarded-host if behind proxy, then origin/referer, then env var
     const xForwardedHost = req.headers['x-forwarded-host'] as string;
@@ -65,6 +80,10 @@ export class AuthController {
       this.logger.log(`Processing Truecaller callback for token access`);
       const result = await this.authService.verifyTruecallerUser(callbackData);
       this.logger.log(`Truecaller verification successful for user: ${result.userId}`);
+      
+      // --- Mark request ID as processed in cache (e.g., for 60 seconds) ---
+      await this.cacheManager.set(processedKey, true, 60);
+      // --- End Mark ---
       
       const cookieDomain = this.getCookieDomain(req);
       const cookieOptions = {

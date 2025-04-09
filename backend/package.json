@@ -17,6 +17,7 @@
   "description": "",
   "dependencies": {
     "@nestjs/axios": "^4.0.0",
+    "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^11.0.13",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.13",
@@ -24,6 +25,7 @@
     "@nestjs/platform-express": "^11.0.13",
     "@supabase/supabase-js": "^2.44.4",
     "axios": "^1.8.4",
+    "cache-manager": "^6.4.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.7",

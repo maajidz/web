@@ -15,15 +15,15 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  // Read origins from environment variable, split by comma, default to empty array
-  const allowedOrigins = (configService.get<string>('ALLOWED_ORIGINS') || '').split(',').filter(Boolean);
-  
-  // Log the loaded origins for debugging
-  console.log('Allowed CORS Origins:', allowedOrigins);
-
+  // Update CORS configuration
   app.enableCors({
-    origin: allowedOrigins,
-    credentials: true,
+    origin: [
+      'http://localhost:3000',
+      'http://192.168.29.30:3000',
+      /\.ngrok-free\.app$/,  // Allow all Ngrok URLs
+      process.env.FRONTEND_URL, // Also allow the frontend URL from env
+    ],
+    credentials: true,  // CRITICAL for cookie auth
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   });

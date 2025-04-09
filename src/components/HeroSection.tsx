@@ -89,11 +89,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
             throw new Error("Backend API URL is not configured.");
           }
 
-          const verifyUrl = `${backendApiUrl}/auth/phone-email/verify`;
-          console.log(`Sending verification request to: ${verifyUrl}`); // Log the target URL
+          const verifyUrl = `/api/auth/phone-email/verify`;
+          console.log(`Sending verification request to: ${verifyUrl}`);
 
           // Send the user_json_url to your backend for final verification and login
-          const response = await fetch(verifyUrl, { // Use the absolute URL
+          const response = await fetch(verifyUrl, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -178,59 +178,51 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
     console.log('[DEBUG] Truecaller deep link URL:', deepLinkUrl);
 
     try {
-      // Store the nonce in sessionStorage to verify it later
       sessionStorage.setItem('truecaller_nonce', requestNonce);
       console.log('[DEBUG] Stored nonce in sessionStorage');
       
       window.location.href = deepLinkUrl;
-      console.log('[DEBUG] Navigated to Truecaller deep link');
-      
-      // Add a timeout to check if we're still on the page after some time
-      setTimeout(() => {
+      console.log('[DEBUG] Navigated to Truecaller deep link. Waiting for external redirect or timeout...');
+
+      // Instead of only a timeout, start a polling interval when focus returns
+      const pollIntervalId = setInterval(() => {
         if (document.hasFocus()) {
-          console.log('[DEBUG] Page still has focus after timeout - likely no Truecaller app or authentication failed');
-        } else {
-          console.log('[DEBUG] Page lost focus - Truecaller app likely opened');
+          console.log('[DEBUG] Focus returned, checking auth status...');
+          
+          // Poll the backend to check if auth was completed
+          fetch(`/api/auth/profile`, {
+            credentials: 'include',
+          })
+          .then(response => {
+            if (response.ok) {
+              console.log('[DEBUG] Auth verified! Redirecting to dashboard');
+              clearInterval(pollIntervalId);
+              window.location.href = '/dashboard';
+            } else {
+              console.log('[DEBUG] Not authenticated yet, continuing to poll...');
+            }
+          })
+          .catch(err => {
+            console.error('[DEBUG] Error checking auth status:', err);
+          });
         }
-      }, 1500);
+      }, 2000); // Check every 2 seconds
+      
+      // Still keep the timeout as a fallback
+      setTimeout(() => {
+        clearInterval(pollIntervalId);
+        if (document.hasFocus() && authState === AuthProcessState.TruecallerLoading) {
+          console.warn('[DEBUG] Auth polling timeout reached. Resetting state.');
+          setAuthState(AuthProcessState.Idle);
+          setAuthError('Truecaller verification timed out.');
+        }
+      }, 20000); // Longer timeout since we're polling
     } catch (err) {
       console.error('[DEBUG] Error in Truecaller deep link navigation:', err);
       setAuthError("Could not start Truecaller verification. Trying phone number verification.");
       setAuthState(AuthProcessState.PhoneEmailTriggered);
     }
   };
-
-  // Add focus listener in useEffect to debug focus events
-  useEffect(() => {
-    const handleFocus = () => {
-      console.log('[DEBUG] Window regained focus');
-      if (authState === AuthProcessState.TruecallerLoading) {
-        console.log('[DEBUG] Window regained focus while in TruecallerLoading state');
-        
-        // Check if we have the nonce in storage
-        const storedNonce = sessionStorage.getItem('truecaller_nonce');
-        console.log('[DEBUG] Stored nonce from session:', storedNonce);
-        
-        // We don't want to reset state here yet - let's just log for debugging
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('[DEBUG] Document became visible again');
-      } else {
-        console.log('[DEBUG] Document visibility changed to:', document.visibilityState);
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [authState]);
 
   // --- Main Login Click Handler ---
   const handleLoginClick = () => {

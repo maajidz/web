@@ -35,7 +35,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     try {
       // Fetch call requires credentials: 'include' to send HttpOnly cookies
-      const response = await fetch(`${BACKEND_URL}/auth/profile`, {
+      const response = await fetch(`/api/auth/profile`, {
         method: 'GET',
         credentials: 'include', // CRITICAL: This tells fetch to include cookies
         headers: {
@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${BACKEND_URL}/auth/logout`, {
+      const response = await fetch(`/api/auth/logout`, {
         method: 'POST',
         credentials: 'include', // Send cookies to clear it
       });
