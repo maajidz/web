@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "flattr-web",
-  "installCommand": "cd ../.. && pnpm install --no-frozen-lockfile",
+  "installCommand": "cd ../.. && pnpm install --no-frozen-lockfile --no-scripts",
   "buildCommand": "cd ../.. && pnpm turbo run build --filter=@flattr/web",
   "outputDirectory": ".next",
   "framework": "nextjs",
@@ -10,4 +10,4 @@
   "github": {
     "silent": true
   }
-} 
+}
