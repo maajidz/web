@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 
-export default function LinkedInCallback() {
+function LinkedInCallbackContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -307,5 +307,32 @@ export default function LinkedInCallback() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Loading fallback UI for the Suspense boundary
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-base-100">
+      <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-lg">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-primary mb-4">Loading...</h1>
+          <div className="flex flex-col items-center">
+            <div className="loading loading-spinner text-primary loading-lg"></div>
+            <p className="mt-4 text-base-content">
+              Preparing authentication...
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function LinkedInCallback() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <LinkedInCallbackContent />
+    </Suspense>
   );
 } 
