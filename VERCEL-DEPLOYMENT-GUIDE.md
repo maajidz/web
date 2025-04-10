@@ -70,13 +70,29 @@ If the registry issues persist, try these steps:
    git push
    ```
 
+## Root Deployment (Not Recommended)
+
+If you're deploying from the root of the monorepo (not recommended), you'll need to avoid recursive Turbo invocations:
+
+1. Use the specialized `vercel-build` or `vercel-build-backend` scripts:
+   - **Build Command**: `npm run vercel-build` (for frontend)
+   - **Build Command**: `npm run vercel-build-backend` (for backend)
+
+2. Alternatively, directly call the build scripts in the desired app:
+   - **Build Command**: `cd apps/web && npm run build` (for frontend)
+   - **Build Command**: `cd apps/backend && npm run build` (for backend)
+
 ## Environment Variables
 
 Make sure to set all required environment variables in the Vercel project settings.
 
 ## Troubleshooting
 
-1. If you still face registry issues, try using `npm` instead of `pnpm` for installation commands
-2. Consider creating a temporary branch for deployment purposes only
-3. Use the `.npmrc` files in each project directory to set registry options and retry settings
-4. For the most critical deployments, consider using the Vercel CLI with `--prod` flag from a local environment 
+1. **Recursive Turbo Invocations**: If you see an error about recursive Turbo invocations, ensure you're not using `turbo run build` in your build command. Instead, use the direct build commands mentioned above.
+
+2. **npm Registry Issues**: 
+   - Try using `npm` instead of `pnpm` for installation commands
+   - Consider creating a temporary branch for deployment purposes only
+   - Use the `.npmrc` files in each project directory to set registry options and retry settings
+
+3. **For Critical Deployments**: Consider using the Vercel CLI with `--prod` flag from a local environment

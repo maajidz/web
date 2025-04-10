@@ -14,7 +14,9 @@
     "test": "turbo run test",
     "clean": "turbo run clean",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "prepare": "SKIP_HUSKY=1 || husky install"
+    "prepare": "SKIP_HUSKY=1 || husky install",
+    "vercel-build": "cd apps/web && npm run build",
+    "vercel-build-backend": "cd apps/backend && npm run build"
   },
   "devDependencies": {
     "eslint": "^9.24.0",
