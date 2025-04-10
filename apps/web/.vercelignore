@@ -1,0 +1,10 @@
+# Ignore development and test files
+node_modules
+.git
+.github
+.next/cache
+.turbo
+
+# Ignore backend files
+../backend
+**/backend 
