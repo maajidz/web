@@ -6,6 +6,7 @@ import Script from 'next/script'; // Import next/script
 import SwipeCard from './SwipeCard';
 import PrettyButton from './PrettyButton';
 import { useOSDetection } from '@/hooks/useOSDetection'; // Import OS detection hook
+import { generateRandomString } from '@/utils/oauth'; // Import OAuth utilities
 
 // Simplified Auth State for this component
 enum AuthProcessState {
@@ -13,6 +14,7 @@ enum AuthProcessState {
   TruecallerLoading, // Waiting for Truecaller deep link
   PhoneEmailLoading, // Waiting for Phone.email verification via backend
   PhoneEmailTriggered, // State to indicate Phone.Email button should be shown/active
+  LinkedInLoading, // Add this line
 }
 
 // Props might not be needed if keys come from env vars later
@@ -62,6 +64,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
   // State Management
   const [authError, setAuthError] = useState<string | null>(null);
   const [authState, setAuthState] = useState<AuthProcessState>(AuthProcessState.Idle);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   // Add state to hold the Phone.Email button code/config from props/env later
   // const [phoneEmailConfig, setPhoneEmailConfig] = useState<string | null>(null);
 
@@ -263,6 +266,93 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
     return {}; // No transform for index 0 or hidden cards
   };
 
+  // --- LinkedIn Login Handler ---
+  const handleLinkedInLogin = () => {
+    setAuthError(null);
+    setAuthState(AuthProcessState.LinkedInLoading);
+    
+    // Generate PKCE code verifier and challenge
+    const state = generateRandomString(32);
+    const codeVerifier = generateRandomString(64);
+    
+    // Store the code verifier in sessionStorage for later use
+    sessionStorage.setItem('linkedin_code_verifier', codeVerifier);
+    sessionStorage.setItem('linkedin_state', state);
+    
+    // Get the LinkedIn OAuth configuration from environment
+    const clientId = process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID;
+    const redirectUri = process.env.NEXT_PUBLIC_LINKEDIN_REDIRECT_URI;
+    
+    if (!clientId || !redirectUri) {
+      console.error("LinkedIn OAuth configuration is missing");
+      setAuthError("LinkedIn login is not properly configured.");
+      setAuthState(AuthProcessState.Idle);
+      return;
+    }
+    
+    // Create the authorization URL with OpenID Connect scope
+    const authUrl = new URL('https://www.linkedin.com/oauth/v2/authorization');
+    authUrl.searchParams.append('response_type', 'code');
+    authUrl.searchParams.append('client_id', clientId);
+    authUrl.searchParams.append('redirect_uri', redirectUri);
+    authUrl.searchParams.append('state', state);
+    authUrl.searchParams.append('scope', 'openid profile email');
+    
+    // Redirect to LinkedIn authorization page
+    window.location.href = authUrl.toString();
+  };
+
+  // Debug function to check auth status
+  const checkAuthStatus = async () => {
+    try {
+      setDebugInfo('Checking auth status...');
+      
+      // Check for auth-token cookie
+      const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+      const authCookie = cookies.find(cookie => cookie.startsWith('auth-token='));
+      
+      // Check session storage for LinkedIn/Truecaller artifacts
+      const linkedInState = sessionStorage.getItem('linkedin_state');
+      const linkedInCodeVerifier = sessionStorage.getItem('linkedin_code_verifier');
+      const truecallerNonce = sessionStorage.getItem('truecaller_nonce');
+      
+      // Call profile API to check backend validation
+      const profileResponse = await fetch('/api/auth/profile', {
+        credentials: 'include'
+      });
+      
+      const profileStatus = profileResponse.status;
+      let profileData = null;
+      
+      if (profileResponse.ok) {
+        profileData = await profileResponse.json();
+      }
+      
+      // Format debug info
+      const debug = `
+Auth Status:
+- Cookie exists: ${!!authCookie}
+- LinkedIn state: ${!!linkedInState}
+- LinkedIn code verifier: ${!!linkedInCodeVerifier}
+- Truecaller nonce: ${!!truecallerNonce}
+- Profile API status: ${profileStatus}
+- User authenticated: ${profileStatus === 200}
+${profileData ? `- User ID: ${profileData.id}` : ''}
+${profileData ? `- Name: ${profileData.name || 'Not set'}` : ''}
+      `;
+      
+      setDebugInfo(debug);
+      
+      if (profileResponse.ok) {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      setDebugInfo(`Error checking auth: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  };
+
   // --- Render Logic ---
   return (
     <>
@@ -284,7 +374,22 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
         <h1 className="text-3xl font-bold text-primary-content mb-3">Find Your Perfect Flatmate</h1>
         <p className="text-base-content/80 mb-6 max-w-xs">Verify your number to get started.</p>
 
-          {/* General Auth Error Display */}
+        {/* Debug Button and Info */}
+        <div className="mb-4">
+          <button 
+            className="btn btn-neutral btn-xs"
+            onClick={checkAuthStatus}
+          >
+            Debug Auth
+          </button>
+          {debugInfo && (
+            <pre className="text-xs text-left bg-base-200 p-2 rounded mt-1 overflow-x-auto max-w-xs">
+              {debugInfo}
+            </pre>
+          )}
+        </div>
+
+        {/* General Auth Error Display */}
         {authError && (
           <div className="alert alert-error shadow-lg text-sm mb-4 max-w-sm mx-auto">
             <div>
@@ -298,13 +403,27 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
 
           {/* Initial Button or Loading State - Show if Idle or Loading */}
           {(authState === AuthProcessState.Idle || isLoading) && (
-            <button 
-              className={`btn btn-primary btn-sm ${isLoading ? 'loading' : ''}`}
-              onClick={handleLoginClick}
-              disabled={isLoading}
-            >
-              {isLoading ? 'Processing...' : 'Login / Sign Up'}
-            </button>
+            <div className="flex flex-col gap-2 items-center">
+              <button 
+                className={`btn btn-primary btn-sm ${isLoading ? 'loading' : ''}`}
+                onClick={handleLoginClick}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Processing...' : 'Login / Sign Up'}
+              </button>
+              
+              {/* LinkedIn Login Button */}
+              <button 
+                className="btn btn-outline btn-sm flex items-center gap-2"
+                onClick={handleLinkedInLogin}
+                disabled={isLoading}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/>
+                </svg>
+                Login with LinkedIn
+              </button>
+            </div>
           )}
 
            {/* Loading state specifically for Truecaller */}
@@ -342,6 +461,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({ partnerKey, partnerName, phon
                 <p className="mt-2 text-sm">Verifying phone number...</p>
              </div>
            )}
+
+          {/* LinkedIn Loading State */}
+          {authState === AuthProcessState.LinkedInLoading && (
+            <div className="text-center mt-4">
+              <span className="loading loading-spinner text-primary loading-lg"></span>
+              <p className="mt-2 text-sm">Connecting to LinkedIn...</p>
+            </div>
+          )}
 
           {/* Card Stack (keep commented out or implement) */}
         {/* <div className="relative h-[420px] w-full max-w-xs mx-auto">

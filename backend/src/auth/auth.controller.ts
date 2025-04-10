@@ -208,6 +208,49 @@ export class AuthController {
     return userProfile;
   }
 
+  @Get('debug-request')
+  async debugRequest(@Req() req: Request) {
+    this.logger.log('Debug request received');
+    
+    // Extract relevant headers and cookies
+    const headers = {
+      host: req.headers.host,
+      'x-forwarded-host': req.headers['x-forwarded-host'],
+      'x-forwarded-proto': req.headers['x-forwarded-proto'],
+      'user-agent': req.headers['user-agent'],
+      origin: req.headers.origin,
+      referer: req.headers.referer,
+      cookie: !!req.headers.cookie,  // Just log presence of cookie header, not the actual values
+    };
+    
+    // Log cookie names without values for privacy
+    const cookieNames = req.cookies ? Object.keys(req.cookies) : [];
+    
+    // Try to parse auth token if present (without logging the full token)
+    let authTokenInfo: string | Record<string, any> = 'Not present';
+    if (req.cookies && req.cookies['auth-token']) {
+      const token = req.cookies['auth-token'];
+      try {
+        // Just check if it can be decoded and log if it has expected fields
+        const decoded = this.authService.decodeToken(token);
+        authTokenInfo = {
+          valid: true,
+          hasUserId: !!decoded?.userId || !!decoded?.sub,
+          expiry: decoded?.exp ? new Date(decoded.exp * 1000).toISOString() : 'unknown',
+        };
+      } catch (e) {
+        authTokenInfo = { valid: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+    
+    return {
+      timestamp: new Date().toISOString(),
+      headers,
+      cookieNames,
+      authTokenInfo,
+    };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Patch('profile/complete') 
   async completeProfile(

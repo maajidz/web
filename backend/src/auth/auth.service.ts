@@ -65,6 +65,12 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  // Add a decodeToken method to help with debugging
+  decodeToken(token: string): any {
+    // This just decodes without verification, for debugging purposes
+    return this.jwtService.decode(token);
+  }
+
   async verifyTruecallerUser(data: TruecallerCallbackDto): Promise<{ userId: string; access_token: string }> {
     this.logger.log(`Fetching Truecaller profile for token: ${data.accessToken?.substring(0, 10)}...`);
     

@@ -52,8 +52,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUserId(null); // Not authenticated
       } else {
         // Handle other non-OK statuses (e.g., 500)
-        console.error('Auth check failed with status:', response.status);
-        setError(`Authentication check failed (Status: ${response.status}).`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Auth check failed with status:', response.status, errorData);
+        setError(`Authentication check failed (Status: ${response.status}). ${errorData.error || ''}`);
         setUserId(null);
       }
     } catch (err) {
@@ -73,15 +74,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await fetch(`/api/auth/logout`, {
         method: 'POST',
         credentials: 'include', // Send cookies to clear it
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.ok) {
         console.log('Logout successful.');
         setUserId(null); // Clear user state
       } else {
-        console.error('Logout failed with status:', response.status);
-        setError(`Logout failed (Status: ${response.status}).`);
-        // Keep user state as is maybe?
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Logout failed with status:', response.status, errorData);
+        setError(`Logout failed (Status: ${response.status}). ${errorData.error || ''}`);
+        // Keep user state as is
       }
     } catch (err) {
       console.error('Error during logout:', err);
