@@ -22,6 +22,7 @@ export interface AuthContextType {
   profile: UserProfile | null;
   // Add any additional auth methods you need
   logout: () => Promise<void>;
+  checkAuthStatus: () => Promise<void>;
 }
 
 // Create the context with a default value
@@ -31,7 +32,8 @@ const AuthContext = createContext<AuthContextType>({
   error: null,
   isAuthenticated: false,
   profile: null,
-  logout: async () => {}
+  logout: async () => {},
+  checkAuthStatus: async () => {}
 });
 
 // Create a provider component
@@ -41,38 +43,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const checkAuthStatus = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch('/api/auth/profile', {
-          credentials: 'include'
-        });
+  const checkAuthStatus = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/auth/profile', {
+        credentials: 'include'
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          setUserId(data.id);
-          setProfile(data);
-          setError(null);
-        } else {
-          // If request fails, user is not authenticated
-          setUserId(null);
-          setProfile(null);
-          if (response.status !== 401) {
-            // Only set error for non-401 responses
-            const errorData = await response.json();
-            setError(errorData.error || 'Authentication failed');
-          }
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to check authentication');
+      if (response.ok) {
+        const data = await response.json();
+        setUserId(data.id);
+        setProfile(data);
+        setError(null);
+      } else {
+        // If request fails, user is not authenticated
         setUserId(null);
         setProfile(null);
-      } finally {
-        setIsLoading(false);
+        if (response.status !== 401) {
+          // Only set error for non-401 responses
+          const errorData = await response.json();
+          setError(errorData.error || 'Authentication failed');
+        }
       }
-    };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to check authentication');
+      setUserId(null);
+      setProfile(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     checkAuthStatus();
   }, []);
 
@@ -101,7 +103,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     error,
     isAuthenticated: !!userId,
     profile,
-    logout
+    logout,
+    checkAuthStatus
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

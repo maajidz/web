@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": [".env", ".env.local"],
+  "globalEnv": ["JWT_SECRET", "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
