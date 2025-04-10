@@ -5,14 +5,13 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "start": "nest start",
+    "start": "node dist/main.js",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rm -rf dist",
-    "vercel-build": "nest build",
-    "prepare": "exit 0"
+    "vercel-build": "nest build"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.0",

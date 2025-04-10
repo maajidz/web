@@ -1,6 +1,9 @@
 {
   "version": 2,
   "name": "flattr-web",
+  "installCommand": "pnpm install --no-scripts",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": ".next",
   "framework": "nextjs",
   "rewrites": [
     {

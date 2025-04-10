@@ -1,0 +1,10 @@
+# Ignore everything in the root
+/*
+
+# But include the specific app directories
+!/apps/backend
+!/apps/web
+
+# Also exclude node_modules in those directories
+/apps/backend/node_modules
+/apps/web/node_modules 
