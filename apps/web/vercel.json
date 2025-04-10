@@ -1,9 +1,6 @@
 {
   "version": 2,
   "name": "flattr-web",
-  "installCommand": "cd ../.. && pnpm install --no-frozen-lockfile --no-scripts",
-  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@flattr/web",
-  "outputDirectory": ".next",
   "framework": "nextjs",
   "rewrites": [
     {
@@ -62,8 +59,7 @@
   "regions": ["sfo1"],
   "github": {
     "silent": true,
-    "deploymentEnabled": {
-      "master": true
-    }
+    "autoAlias": true,
+    "enabled": true
   }
 }

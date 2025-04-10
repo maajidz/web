@@ -27,7 +27,8 @@
   "regions": ["sfo1"],
   "public": false,
   "github": {
-    "enabled": false,
-    "silent": true
+    "silent": true,
+    "autoAlias": true,
+    "enabled": true
   }
 } 
