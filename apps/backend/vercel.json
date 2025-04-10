@@ -1,7 +1,9 @@
 {
   "version": 2,
   "name": "flattr-api",
-  "buildCommand": "npm run build",
+  "installCommand": "pnpm install --no-scripts",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "dist",
   "builds": [
     {
       "src": "src/main.ts",
