@@ -1,13 +1,20 @@
 {
   "version": 2,
   "name": "flattr-api",
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@flattr/backend",
+  "builds": [
+    {
+      "src": "dist/main.js",
+      "use": "@vercel/node"
+    }
+  ],
   "routes": [
     {
       "src": "/(.*)",
       "dest": "dist/main.js",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       "headers": {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": "https://www.flattr.io",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization, Cookie",
         "Access-Control-Allow-Credentials": "true"
@@ -19,5 +26,9 @@
     "FRONTEND_URL": "https://www.flattr.io"
   },
   "regions": ["sfo1"],
-  "public": false
+  "public": false,
+  "github": {
+    "enabled": false,
+    "silent": true
+  }
 } 

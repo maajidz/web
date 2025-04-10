@@ -1,0 +1,53 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm turbo run build",
+  "devCommand": "npm run dev",
+  "installCommand": "pnpm install",
+  "framework": null,
+  "outputDirectory": null,
+  "ignoreCommand": "pnpm turbo run build --dry",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.flattr.io/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  },
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?!www\\.flattr\\.io).*"
+        }
+      ],
+      "destination": "https://www.flattr.io/$1",
+      "statusCode": 307,
+      "permanent": false
+    }
+  ]
+}

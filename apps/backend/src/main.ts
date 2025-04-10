@@ -14,12 +14,6 @@ async function bootstrap() {
   // -------------------------------------------------------
 
   const configService = app.get(ConfigService);
-  
-  // Get allowed origins from environment or use defaults
-  const allowedOriginsString = configService.get<string>('ALLOWED_ORIGINS') || '';
-  const allowedOrigins = allowedOriginsString.split(',').filter(origin => origin);
-  
-  logger.log(`Configured allowed origins: ${allowedOrigins.join(', ')}`);
 
   // Update CORS configuration
   app.enableCors({
@@ -27,8 +21,7 @@ async function bootstrap() {
       'http://localhost:3000',
       'http://192.168.29.30:3000',
       /\.ngrok-free\.app$/,  // Allow all Ngrok URLs
-      /\.vercel\.app$/,      // Allow all Vercel preview URLs
-      ...allowedOrigins,     // Include origins from environment
+      process.env.FRONTEND_URL, // Also allow the frontend URL from env
     ],
     credentials: true,  // CRITICAL for cookie auth
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

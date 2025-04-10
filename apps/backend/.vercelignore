@@ -3,9 +3,4 @@
 *
 !dist/
 !vercel.json
-!package.json
-
-# exclude all node_modules directories
-node_modules
-dist
-.git
+!package.json 
