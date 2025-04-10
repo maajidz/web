@@ -1,6 +1,9 @@
 {
   "version": 2,
   "name": "flattr-api",
+  "buildCommand": "./build.sh",
+  "installCommand": "npm install --prefer-offline --no-audit",
+  "outputDirectory": "dist",
   "builds": [
     {
       "src": "dist/main.js",
