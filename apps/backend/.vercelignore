@@ -3,4 +3,8 @@
 *
 !dist/
 !vercel.json
-!package.json 
+!package.json
+.git
+.husky
+node_modules
+.turbo 
