@@ -1,9 +1,6 @@
 {
   "version": 2,
   "name": "flattr-web",
-  "installCommand": "pnpm install --no-scripts",
-  "buildCommand": "pnpm run build",
-  "outputDirectory": ".next",
   "framework": "nextjs",
   "rewrites": [
     {
@@ -59,10 +56,5 @@
       "statusCode": 307
     }
   ],
-  "regions": ["sfo1"],
-  "github": {
-    "silent": true,
-    "autoAlias": true,
-    "enabled": true
-  }
+  "regions": ["sfo1"]
 }

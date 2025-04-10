@@ -1,15 +1,6 @@
 {
   "version": 2,
   "name": "flattr-api",
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "dist",
-  "installCommand": "pnpm install --no-scripts",
-  "builds": [
-    {
-      "src": "dist/main.js",
-      "use": "@vercel/node"
-    }
-  ],
   "routes": [
     {
       "src": "/(.*)",
@@ -28,10 +19,5 @@
     "FRONTEND_URL": "https://www.flattr.io"
   },
   "regions": ["sfo1"],
-  "public": false,
-  "github": {
-    "silent": true,
-    "autoAlias": true,
-    "enabled": true
-  }
+  "public": false
 } 
