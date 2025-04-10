@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Flattr - Monorepo
+
+This repository contains the Flattr application, structured as a Turborepo monorepo with Next.js frontend and NestJS backend.
+
+## Project Structure
+
+```
+flattr/
+├── apps/
+│   ├── web/           # Next.js frontend
+│   └── backend/       # NestJS backend
+├── packages/
+│   └── ui/            # Shared UI components
+├── turbo.json         # Turborepo configuration
+└── package.json       # Root package.json
+```
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Run the development server:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deployment on Vercel
 
-## Learn More
+### Important: Deployment Configuration
 
-To learn more about Next.js, take a look at the following resources:
+To avoid recursive Turbo invocations when deploying to Vercel, use separate projects for frontend and backend.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+#### Frontend Deployment:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Create a new project in Vercel
+2. Set the following:
+   - **Root Directory**: `apps/web`
+   - **Build Command**: `npm run build`
+   - **Install Command**: `npm install --no-scripts`
+   - **Output Directory**: `.next`
 
-## Deploy on Vercel
+#### Backend Deployment:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Create a new project in Vercel
+2. Set the following:
+   - **Root Directory**: `apps/backend`
+   - **Build Command**: `npm run build`
+   - **Install Command**: `npm install --no-scripts`
+   - **Output Directory**: `dist`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See the `VERCEL-DEPLOYMENT-GUIDE.md` file for more detailed deployment instructions and troubleshooting tips.
