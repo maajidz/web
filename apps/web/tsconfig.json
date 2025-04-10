@@ -7,8 +7,18 @@
       "@/*": ["./src/*"],
       "@flattr/ui": ["../../packages/ui/src/index.ts"],
       "@flattr/ui/*": ["../../packages/ui/src/*"]
-    }
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ]
   },
-  "include": ["next-env.d.ts", ".next/types/**/*.ts", "**/*.ts", "**/*.tsx"],
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "src/types/**/*.d.ts"
+  ],
   "exclude": ["node_modules"]
 } 

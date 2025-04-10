@@ -3,8 +3,11 @@
   "globalDependencies": [".env", ".env.local"],
   "globalEnv": ["JWT_SECRET", "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"],
   "tasks": {
+    "prebuild": {
+      "outputs": []
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "prebuild"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "dev": {
