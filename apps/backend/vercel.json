@@ -2,7 +2,7 @@
   "version": 2,
   "name": "flattr-api",
   "buildCommand": "./build.sh",
-  "installCommand": "npm install --prefer-offline --no-audit",
+  "installCommand": "HUSKY=0 HUSKY_SKIP_INSTALL=1 npm install --prefer-offline --no-audit --no-scripts",
   "outputDirectory": "dist",
   "builds": [
     {
