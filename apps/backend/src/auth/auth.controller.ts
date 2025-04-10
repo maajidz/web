@@ -342,6 +342,12 @@ export class AuthController {
       return undefined;
     }
     
+    // For Vercel preview domains
+    if (host.includes('vercel.app')) {
+      this.logger.debug(`Host is Vercel preview, returning undefined domain.`);
+      return undefined;
+    }
+    
     // For production domain
     if (host.includes('flattr.io')) {
       this.logger.debug('Host is flattr.io, returning domain: .flattr.io');
