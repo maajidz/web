@@ -1,11 +1,12 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm turbo run build",
-  "devCommand": "npm run dev",
-  "installCommand": "pnpm install",
-  "framework": null,
-  "outputDirectory": null,
-  "ignoreCommand": "pnpm turbo run build --dry",
+  "version": 2,
+  "name": "flattr-monorepo",
+  "github": {
+    "silent": true
+  },
+  "buildCommand": "cd apps/backend && npm run build",
+  "installCommand": "cd apps/backend && npm install --no-scripts",
+  "outputDirectory": "apps/backend/dist",
   "rewrites": [
     {
       "source": "/api/:path*",
