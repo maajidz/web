@@ -1,6 +1,7 @@
 {
   "version": 2,
   "name": "flattr-api",
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@flattr/backend",
   "builds": [
     {
       "src": "dist/main.js",

@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "flattr-web",
-  "buildCommand": "cd ../.. && pnpm turbo run build --filter=web",
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@flattr/web",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "relatedProjects": ["flattr-api"],
