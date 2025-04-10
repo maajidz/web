@@ -1,0 +1,6 @@
+# Ignore everything for branches other than main
+# This prevents preview deployments
+*
+!dist/
+!vercel.json
+!package.json 

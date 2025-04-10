@@ -1,17 +1,22 @@
 # Environment variables
 .env*
 !.env.example
+!.env.local.example
+!.env.production
 
 # Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+package-lock.json
 
 # Build outputs
 dist/
 .next/
 out/
+build/
 
 # OS generated files
 .DS_Store
@@ -20,10 +25,64 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+.cursor/
 
 # Supabase
-supabase/
+supabase/.temp/
+**/supabase/.temp/
 !supabase/migrations/
+!**/supabase/migrations/
 
 # Always track backend migrations
 !backend/migrations/
+!apps/backend/migrations/
+
+# Turborepo
+.turbo/
+
+# Vercel
+.vercel/
+
+# Build directories
+**/dist
+**/.next
+**/build
+
+# Cache directories
+**/.cache
+**/cache
+**/tmp
+
+# Test coverage
+**/coverage
+**/.nyc_output
+
+# Local backups
+backup/
+**/backup
+
+# Logs
+logs/
+**/logs
+**/*.log
+
+# Local Netlify folder
+.netlify/
+
+# Package manager locks (except pnpm)
+**/package-lock.json
+**/yarn.lock
+!pnpm-lock.yaml
+
+# Temporary files
+**/temp
+**/.temp
+**/*.tmp
+
+# Large media files
+**/*.mp4
+**/*.tiff
+**/*.avi
+**/*.flv
+**/*.mov
+**/*.wmv
