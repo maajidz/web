@@ -1,8 +1,8 @@
 {
   "version": 2,
   "name": "flattr-api",
-  "installCommand": "cd ../.. && pnpm install --no-frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@flattr/backend",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "framework": null,
   "functions": {
