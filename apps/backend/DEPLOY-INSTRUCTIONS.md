@@ -1,59 +1,57 @@
-# Backend Deployment Instructions (Stand-alone Project)
+# Backend Deployment Instructions
 
-It appears that deploying the backend through the monorepo configuration is causing issues with Turborepo. As an alternative, you can deploy the backend as a stand-alone project using these steps:
+Use the following settings when creating a new backend project in Vercel:
 
-## Approach 1: Deploy From Vercel Dashboard
+## Project Configuration
 
-1. **Create a New Project in Vercel**
-   - Go to the Vercel Dashboard and click "Add New Project"
-   - Import your GitHub repository
+1. **Root Directory**: 
+   - Set to `apps/backend`
 
-2. **Configure the Project**
-   - Set the Framework Preset to: **Other**
-   - Set the Root Directory to: **apps/backend**
-   - Build Command: `pnpm build`
-   - Output Directory: `dist`
-   - Install Command: `pnpm install`
+2. **Framework Preset**:
+   - Set to `Other`
 
-3. **Add Environment Variables**
-   - Add all required environment variables from your .env file
-   - Be sure to include:
-     ```
-     NODE_ENV=production
-     PORT=3000
-     FRONTEND_URL=https://flattr.io
-     JWT_SECRET=your_secret
-     SUPABASE_URL=your_supabase_url
-     SUPABASE_SERVICE_ROLE_KEY=your_service_key
-     COOKIE_DOMAIN=flattr.io
-     ```
+3. **Build Command**:
+   - Set to `pnpm build`
 
-4. **Deploy**
-   - Click "Deploy" to start the deployment
+4. **Output Directory**:
+   - Set to `dist`
 
-## Approach 2: Direct Upload (If Git Method Fails)
+5. **Install Command**:
+   - Set to `pnpm install`
 
-If you're still encountering issues with the Git-based deployment, you can try a direct upload approach:
+## Environment Variables
 
-1. Build the backend locally:
-   ```bash
-   cd apps/backend
-   pnpm install
-   pnpm build
-   ```
+Add the following environment variables:
 
-2. Use the Vercel CLI to deploy the dist folder directly:
-   ```bash
-   cd dist
-   vercel --prod
-   ```
+```
+NODE_ENV=production
+PORT=3000
+FRONTEND_URL=https://flattr.io
+JWT_SECRET=your_secret
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_key
+COOKIE_DOMAIN=flattr.io
+ALLOWED_ORIGINS=https://flattr.io,https://www.flattr.io
+```
+
+## Domain Setup
+
+After deployment:
+1. Go to Settings > Domains
+2. Add `api.flattr.io` as the domain
+3. Configure the DNS settings as instructed by Vercel
 
 ## Important Notes
 
-- Make sure your backend's `package.json` has the correct name `@flattr/backend`
-- The backend should be added as a separate project in Vercel, not as part of the monorepo deployment
-- Once deployed, add your custom domain (api.flattr.io) in the Vercel project settings
+When deploying the backend as a separate project:
+- Make sure the Vercel CLI uses the `apps/backend` directory as the root
+- The `vercel.json` file in the backend directory has all the necessary configuration
+- After deployment, update any frontend API URLs to point to `https://api.flattr.io`
+- Ensure the CORS settings allow your frontend domain
 
 ## Troubleshooting
 
-If you continue to encounter issues with Turborepo in the Vercel environment, consider extracting the backend to a separate repository for deployment. 
+If you encounter build issues:
+- Check if the NestJS CLI is properly installed as a dependency
+- Ensure the build script in `package.json` is `"build": "nest build"`
+- Verify that your environment variables are correctly set in Vercel 
