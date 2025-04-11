@@ -15,14 +15,28 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
+  // Parse allowed origins from environment or use defaults
+  const allowedOriginsStr = configService.get<string>('ALLOWED_ORIGINS') || '';
+  const defaultOrigins = [
+    'http://localhost:3000',
+    'http://192.168.29.30:3000',
+    'https://flattr.io',
+    'https://www.flattr.io',
+    /\.ngrok-free\.app$/,
+    /\.vercel\.app$/
+  ];
+  
+  // Combine environment origins with defaults
+  const allowedOrigins = [
+    ...defaultOrigins,
+    ...allowedOriginsStr.split(',').filter(origin => origin.trim())
+  ];
+  
+  logger.log(`Allowed origins: ${JSON.stringify(allowedOrigins)}`);
+
   // Update CORS configuration
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://192.168.29.30:3000',
-      /\.ngrok-free\.app$/,  // Allow all Ngrok URLs
-      process.env.FRONTEND_URL, // Also allow the frontend URL from env
-    ],
+    origin: allowedOrigins,
     credentials: true,  // CRITICAL for cookie auth
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
@@ -33,7 +47,7 @@ async function bootstrap() {
   const port = configService.get<number>('PORT') || 3001;
 
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`Application is running on: http://localhost:${port}`);
 }
 
 bootstrap();

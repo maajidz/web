@@ -1,34 +1,36 @@
 {
   "version": 2,
   "name": "flattr-api",
+  "installCommand": "cd ../.. && pnpm install --no-frozen-lockfile",
   "buildCommand": "cd ../.. && pnpm turbo run build --filter=@flattr/backend",
-  "builds": [
-    {
-      "src": "dist/main.js",
-      "use": "@vercel/node"
+  "outputDirectory": "dist",
+  "framework": null,
+  "functions": {
+    "dist/**/*.js": {
+      "memory": 1024,
+      "maxDuration": 10
     }
-  ],
-  "routes": [
+  },
+  "headers": [
     {
-      "src": "/(.*)",
-      "dest": "dist/main.js",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-      "headers": {
-        "Access-Control-Allow-Origin": "https://www.flattr.io",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, Cookie",
-        "Access-Control-Allow-Credentials": "true"
-      }
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "https://flattr.io" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,PATCH,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, Cookie" },
+        { "key": "Access-Control-Allow-Credentials", "value": "true" }
+      ]
     }
   ],
   "env": {
     "NODE_ENV": "production",
-    "FRONTEND_URL": "https://www.flattr.io"
+    "FRONTEND_URL": "https://flattr.io"
   },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/dist/main.js" }
+  ],
   "regions": ["sfo1"],
-  "public": false,
   "github": {
-    "enabled": false,
     "silent": true
   }
 } 
