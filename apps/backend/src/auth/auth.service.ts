@@ -13,6 +13,8 @@ import axios, { AxiosError } from 'axios';
 import { JwtService } from '@nestjs/jwt'; // Import JwtService
 import { UserProfile, DbUserProfile } from './entities/user-profile.entity'; // Import both interfaces
 import { TruecallerCallbackDto } from './dto/truecaller-callback.dto'; // Correct import
+import { ConfigService } from '@nestjs/config'; // Import ConfigService
+import { URLSearchParams } from 'url'; // Import URLSearchParams
 
 // Interface for the expected Truecaller profile structure
 // Adjust based on the actual data returned by their API
@@ -48,6 +50,7 @@ export class AuthService {
     private readonly httpService: HttpService,
     private readonly supabaseService: SupabaseService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService, // Inject ConfigService
   ) {}
 
   // Add a decodeToken method to help with debugging
@@ -419,4 +422,78 @@ export class AuthService {
       }
   }
   // +++ End NEW Method +++
+
+  // +++ IMPLEMENTING LINKEDIN METHOD +++
+  async exchangeLinkedInCode(
+    code: string,
+    codeVerifier: string, 
+  ): Promise<{ success: boolean; userId?: string; access_token?: string; error?: string }> {
+    this.logger.log(`[LinkedIn] Exchanging code for token. Code starts: ${code?.substring(0, 10)}...`);
+
+    const clientId = this.configService.get<string>('LINKEDIN_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('LINKEDIN_CLIENT_SECRET');
+    const redirectUri = this.configService.get<string>('LINKEDIN_REDIRECT_URI');
+    const tokenUrl = 'https://www.linkedin.com/oauth/v2/accessToken';
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      this.logger.error('[LinkedIn] Missing required environment variables (ID, SECRET, or REDIRECT_URI)');
+      return { success: false, error: 'LinkedInConfigMissing' };
+    }
+
+    // Prepare form data for LinkedIn token request
+    const params = new URLSearchParams();
+    params.append('grant_type', 'authorization_code');
+    params.append('code', code);
+    params.append('redirect_uri', redirectUri);
+    params.append('client_id', clientId);
+    params.append('client_secret', clientSecret);
+    params.append('code_verifier', codeVerifier); // Include PKCE code verifier
+
+    try {
+      const tokenResponse = await firstValueFrom(
+        this.httpService.post(tokenUrl, params, {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        })
+        .pipe(
+          map((response) => response.data),
+          catchError((error: AxiosError) => {
+            this.logger.error(`[LinkedIn] Error exchanging code: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`, error.stack);
+            throw new HttpException('Failed to exchange LinkedIn code', HttpStatus.INTERNAL_SERVER_ERROR);
+          })
+        )
+      );
+
+      const linkedinAccessToken = tokenResponse.access_token;
+      // const linkedinIdToken = tokenResponse.id_token; // If using OpenID Connect scopes
+
+      if (!linkedinAccessToken) {
+          this.logger.error('[LinkedIn] No access_token received from LinkedIn.');
+          return { success: false, error: 'LinkedInTokenMissing' };
+      }
+
+      this.logger.log(`[LinkedIn] Access token received: ${linkedinAccessToken.substring(0, 10)}...`);
+
+      // --- TODO: Step 2: Fetch User Info --- 
+      this.logger.warn('[LinkedIn] User info fetching not yet implemented.');
+
+      // --- TODO: Step 3: Validate/Login User --- 
+      this.logger.warn('[LinkedIn] User validation/login not yet implemented.');
+      
+      // --- TODO: Step 4: Generate JWT --- 
+      this.logger.warn('[LinkedIn] JWT generation not yet implemented for LinkedIn flow.');
+
+      // Placeholder failure until fully implemented
+      return { success: false, error: 'LinkedInFlowIncomplete' };
+
+    } catch (error) {
+       // Handle errors thrown from catchError or other issues
+       this.logger.error(`[LinkedIn] Unexpected error during code exchange process: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+       // Return specific error if HttpException, otherwise generic
+       const errorMsg = error instanceof HttpException ? error.message : 'InternalServerError';
+       return { success: false, error: errorMsg };
+    }
+  }
+  // +++ END LINKEDIN METHOD +++
 } 

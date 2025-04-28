@@ -25,6 +25,7 @@ import { TruecallerCallbackDto } from './dto/truecaller-callback.dto';
 import { CacheModule, CacheInterceptor, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { UserProfile, DbUserProfile } from './entities/user-profile.entity';
+import { LinkedInCodeDto } from './dto/linkedin-code.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -321,6 +322,48 @@ export class AuthController {
   ping(): string {
       this.logger.log('Received ping request');
       return 'pong';
+  }
+
+  @Post('linkedin/token')
+  async handleLinkedInTokenExchange(
+    @Body() linkedInCodeDto: LinkedInCodeDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.logger.log(`Received request to exchange LinkedIn code: ${linkedInCodeDto.code?.substring(0, 10)}...`);
+    try {
+      const result = await this.authService.exchangeLinkedInCode(
+        linkedInCodeDto.code,
+        linkedInCodeDto.codeVerifier
+      );
+
+      if (result.success && result.access_token && result.userId) {
+        this.logger.log(`LinkedIn exchange successful for user: ${result.userId}`);
+        // Set JWT cookie (same logic as other methods)
+        const cookieDomain = this.getCookieDomain(req);
+        const cookieOptions = {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none' as const,
+          domain: cookieDomain,
+          partitioned: true,
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+          path: '/',
+        };
+        this.logger.debug(`Setting auth cookie with options: ${JSON.stringify(cookieOptions)}`);
+        res.cookie('auth-token', result.access_token, cookieOptions);
+        return { success: true, userId: result.userId }; // Return success to frontend
+      } else {
+        this.logger.error(`LinkedIn token exchange failed: ${result.error}`);
+        throw new HttpException(
+          result.error || 'LinkedInTokenExchangeFailed',
+          HttpStatus.INTERNAL_SERVER_ERROR // Or BAD_REQUEST depending on error type
+        );
+      }
+    } catch (error: unknown) {
+      this.logger.error(`Error during LinkedIn token exchange: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+      throw error instanceof HttpException ? error : new HttpException('InternalServerError', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   private getCookieDomain(req: Request): string | undefined {
