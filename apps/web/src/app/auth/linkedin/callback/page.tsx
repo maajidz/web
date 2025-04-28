@@ -52,7 +52,7 @@ function LinkedInCallbackContent() {
         }
         
         // Exchange the authorization code for tokens
-        const tokenResponse = await fetch('/api/auth/linkedin/token', {
+        const tokenResponse = await fetch('https://api.flattr.io/auth/linkedin/token', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
