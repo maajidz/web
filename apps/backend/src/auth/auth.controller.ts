@@ -13,6 +13,7 @@ import {
   Patch,
   UnauthorizedException,
   Inject,
+  NotFoundException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Response, Request } from 'express';
@@ -205,10 +206,12 @@ export class AuthController {
         throw new UnauthorizedException('User not authenticated or token missing subject');
       }
 
+      this.logger.log(`Fetching profile in controller for user ID: ${userId}`);
       const userProfile = await this.authService.getUserProfile(userId);
       
       if (!userProfile) {
-        throw new UnauthorizedException('User profile not found');
+        this.logger.warn(`Profile not found in controller for user ID: ${userId}, returning 404.`);
+        throw new NotFoundException('User profile not found');
       }
       
       return userProfile;
