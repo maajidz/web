@@ -99,10 +99,7 @@ export class UsersService {
                         first_name: firstName || null,
                         last_name: lastName || null,
                         profile_picture_url: profilePictureUrl || null,
-                        // phone_number: '', // Set required phone_number - needs a default or make nullable?
-                        // If phone_number is required and non-nullable, we need a strategy here.
-                        // For now, assuming it might be nullable or has a default value.
-                        // Or we need to add it to DbUserProfile as potentially null/undefined
+                        phone_number: '', // Explicitly set required phone_number to empty string
                         // --- NOTE: The following requires a 'linkedin_id' text column (or similar) in 'user_profiles' ---
                         // Uncomment this line once the column exists
                         // linkedin_id: providerUserId,
@@ -139,11 +136,6 @@ export class UsersService {
                 }
 
                 this.logger.log(`New user created successfully: ${newUser.id}`);
-                // We need to handle the required phone_number here if it wasn't set during insert
-                if (!newUser.phone_number) {
-                    this.logger.warn(`New user ${newUser.id} created without a phone number. Assigning empty string.`);
-                    newUser.phone_number = ''; // Assign default if needed and possible
-                }
                 return newUser as DbUserProfile;
             }
 
