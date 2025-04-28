@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const checkAuthStatus = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('https://api.flattr.io/auth/profile', {
+      const response = await fetch('/api/auth/profile', {
         credentials: 'include'
       });
 
@@ -80,7 +80,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     try {
-      const response = await fetch('https://api.flattr.io/auth/logout', {
+      const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });
