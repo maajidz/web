@@ -59,7 +59,7 @@
       }
     },
     {
-      "src": "apps/backend/dist/main.ts",
+      "src": "apps/backend/dist/main.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": ["apps/backend/dist/**"]
@@ -69,7 +69,7 @@
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "apps/backend/dist/main.ts"
+      "dest": "apps/backend/dist/main.js"
     }
   ]
 }
