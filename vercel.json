@@ -48,5 +48,28 @@
       "statusCode": 307,
       "permanent": false
     }
+  ],
+  "version": 2,
+  "builds": [
+    {
+      "src": "apps/backend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "apps/backend/dist/main.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["apps/backend/dist/**"]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "apps/backend/dist/main.ts"
+    }
   ]
 }
