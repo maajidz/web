@@ -49,22 +49,5 @@
       "permanent": false
     }
   ],
-  "version": 2,
-  "builds": [
-    {
-      "src": "apps/backend/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
-    },
-    {
-      "src": "apps/backend/dist/main.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "apps/backend/dist/main.js"
-    }
-  ]
+  "version": 2
 }
