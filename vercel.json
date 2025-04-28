@@ -47,21 +47,5 @@
       "permanent": false
     }
   ],
-  "version": 2,
-  "builds": [
-    {
-      "src": "apps/backend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "apps/backend/dist/main.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["apps/backend/dist/**"]
-      }
-    }
-  ]
+  "version": 2
 }
