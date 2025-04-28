@@ -1,0 +1,29 @@
+# render.yaml
+services:
+  - name: flattr-backend # You can change this name in Render UI
+    type: web
+    env: node
+    plan: starter # Or free, standard, etc.
+    rootDir: apps/backend # Specifies the directory for this service
+    buildCommand: "pnpm install --prod=false && pnpm run build" # Installs all deps for build, then builds
+    startCommand: "node dist/main.js" # Runs the built application
+    healthCheckPath: /ping # Your existing health check endpoint
+    envVars:
+      - key: NODE_VERSION # Optional: Specify Node version if needed
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: PORT # Render provides the port; NestJS should use it
+        value: 10000 # Default Render port, but it sets PORT env var automatically
+      # --- Secrets to set in Render Dashboard ---
+      - key: DATABASE_URL
+        sync: false # Set value in Render UI (Supabase connection string)
+      - key: JWT_SECRET
+        sync: false # Set value in Render UI
+      - key: FRONTEND_URL
+        sync: false # Set value in Render UI (e.g., https://your-frontend.onrender.com)
+      # Add other necessary env vars like Truecaller keys, Redis details (if used), etc.
+      # - key: TRUECALLER_CLIENT_ID
+      #   sync: false
+      # - key: ALLOWED_ORIGINS # Optional, as CORS config uses FRONTEND_URL or defaults
+      #   sync: false 

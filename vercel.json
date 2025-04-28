@@ -4,6 +4,7 @@
   "installCommand": "pnpm install",
   "framework": null,
   "outputDirectory": null,
+  "ignoreCommand": "pnpm turbo run build --dry",
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -44,8 +45,33 @@
         }
       ],
       "destination": "https://www.flattr.io/$1",
+      "statusCode": 307,
       "permanent": false
     }
   ],
-  "version": 2
+  "version": 2,
+  "builds": [
+    {
+      "src": "apps/backend/src/main.ts",
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["dist/**"] } 
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "apps/backend/src/main.ts",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "OPTIONS",
+        "DELETE",
+        "HEAD",
+        "CONNECT",
+        "TRACE"
+      ]
+    }
+  ]
 }

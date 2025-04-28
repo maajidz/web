@@ -22,8 +22,9 @@ async function bootstrap() {
     'http://192.168.29.30:3000',
     'https://flattr.io',
     'https://www.flattr.io',
-    /\.ngrok-free\.app$/,
-    /\.vercel\.app$/
+    /\\.ngrok-free\\.app$/,
+    /\\.vercel\\.app$/,
+    /\\.onrender\\.com$/
   ];
   
   // Combine environment origins with defaults
