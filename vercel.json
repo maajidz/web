@@ -65,11 +65,5 @@
         "includeFiles": ["apps/backend/dist/**"]
       }
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "apps/backend/dist/main.js"
-    }
   ]
 }
