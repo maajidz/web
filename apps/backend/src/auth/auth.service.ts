@@ -9,7 +9,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { SupabaseService } from '../supabase/supabase.service'; // Adjust path if needed
 import { firstValueFrom, map, catchError } from 'rxjs';
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios'; // Ensure AxiosError is imported
 import { JwtService } from '@nestjs/jwt'; // Import JwtService
 import { UserProfile, DbUserProfile } from './entities/user-profile.entity'; // Import both interfaces
 import { TruecallerCallbackDto } from './dto/truecaller-callback.dto'; // Correct import
@@ -436,42 +436,34 @@ export class AuthService {
     const tokenUrl = 'https://www.linkedin.com/oauth/v2/accessToken';
 
     if (!clientId || !clientSecret || !redirectUri) {
-      this.logger.error('[LinkedIn] Missing required environment variables (ID, SECRET, or REDIRECT_URI)');
-      return { success: false, error: 'LinkedInConfigMissing' };
+        this.logger.error('[LinkedIn] Missing required environment variables (ID, SECRET, or REDIRECT_URI)');
+        return { success: false, error: 'LinkedInConfigMissing' };
     }
 
-    // +++ Add Logging for Credentials (Masked Secret) +++
     const maskedSecret = clientSecret ? `${clientSecret.substring(0, 3)}...${clientSecret.substring(clientSecret.length - 3)}` : 'SECRET_MISSING';
     this.logger.debug(`[LinkedIn] Attempting token exchange with ClientID: ${clientId}, Masked Secret: ${maskedSecret}, Redirect URI: ${redirectUri}`);
-    // +++ End Logging +++
 
-    // Prepare form data for LinkedIn token request
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
     params.append('code', code);
     params.append('redirect_uri', redirectUri);
     params.append('client_id', clientId);
     params.append('client_secret', clientSecret);
-    params.append('code_verifier', codeVerifier); // Include PKCE code verifier
+    params.append('code_verifier', codeVerifier); 
 
     try {
-      const tokenResponse = await firstValueFrom(
-        this.httpService.post(tokenUrl, params, {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        })
-        .pipe(
-          map((response) => response.data),
-          catchError((error: AxiosError) => {
-            this.logger.error(`[LinkedIn] Error exchanging code: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`, error.stack);
-            throw new HttpException('Failed to exchange LinkedIn code', HttpStatus.INTERNAL_SERVER_ERROR);
-          })
-        )
-      );
+      // --- Using direct axios call instead of HttpService ---
+      const response = await axios.post(tokenUrl, params, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+      
+      const tokenResponse = response.data; // Axios puts data directly in response.data
+      // --- End direct axios call ---
 
       const linkedinAccessToken = tokenResponse.access_token;
-      // const linkedinIdToken = tokenResponse.id_token; // If using OpenID Connect scopes
+      // const linkedinIdToken = tokenResponse.id_token; 
 
       if (!linkedinAccessToken) {
           this.logger.error('[LinkedIn] No access_token received from LinkedIn.');
@@ -480,24 +472,38 @@ export class AuthService {
 
       this.logger.log(`[LinkedIn] Access token received: ${linkedinAccessToken.substring(0, 10)}...`);
 
-      // --- TODO: Step 2: Fetch User Info --- 
+      // --- TODO Steps --- 
       this.logger.warn('[LinkedIn] User info fetching not yet implemented.');
-
-      // --- TODO: Step 3: Validate/Login User --- 
       this.logger.warn('[LinkedIn] User validation/login not yet implemented.');
-      
-      // --- TODO: Step 4: Generate JWT --- 
       this.logger.warn('[LinkedIn] JWT generation not yet implemented for LinkedIn flow.');
-
-      // Placeholder failure until fully implemented
       return { success: false, error: 'LinkedInFlowIncomplete' };
 
-    } catch (error) {
-       // Handle errors thrown from catchError or other issues
-       this.logger.error(`[LinkedIn] Unexpected error during code exchange process: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
-       // Return specific error if HttpException, otherwise generic
-       const errorMsg = error instanceof HttpException ? error.message : 'InternalServerError';
-       return { success: false, error: errorMsg };
+    } catch (error) { // Keep catch (error), but check type inside
+        // Handle Axios error structure
+        let status = HttpStatus.INTERNAL_SERVER_ERROR;
+        let errorDetails = 'Unknown error during LinkedIn code exchange';
+        let loggedStack: string | undefined = undefined;
+
+        if (axios.isAxiosError(error)) { // Use type guard
+            status = error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
+            errorDetails = JSON.stringify(error.response?.data) || error.message;
+            loggedStack = error.stack;
+            this.logger.error(`[LinkedIn] Axios Error exchanging code: ${status} - ${errorDetails}`, loggedStack);
+        } else if (error instanceof Error) { // Handle generic Error
+            errorDetails = error.message;
+            loggedStack = error.stack;
+            this.logger.error(`[LinkedIn] Non-Axios Error during code exchange: ${errorDetails}`, loggedStack);
+        } else { // Handle other unknown throws
+            errorDetails = String(error);
+            this.logger.error(`[LinkedIn] Unknown error type during code exchange: ${errorDetails}`);
+        }
+       
+       // Return specific error if possible, otherwise generic
+       // Return the actual status if it's a known HTTP error from LinkedIn
+       const returnErrorMsg = status !== HttpStatus.INTERNAL_SERVER_ERROR 
+         ? `LinkedInTokenExchangeFailed - Status ${status}` 
+         : 'InternalServerError';
+       return { success: false, error: returnErrorMsg };
     }
   }
   // +++ END LINKEDIN METHOD +++

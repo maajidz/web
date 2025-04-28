@@ -37,7 +37,7 @@ async function bootstrap() {
 
   // Update CORS configuration
   app.enableCors({
-    origin: allowedOrigins,
+    origin: true, // TEMP: Reflect request origin for debugging CORS preflight
     credentials: true,  // CRITICAL for cookie auth
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
