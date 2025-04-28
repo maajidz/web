@@ -199,10 +199,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async getProfile(@Req() req: Request): Promise<DbUserProfile> {
     try {
-      const userId = req['user']?.userId;
+      const userId = req['user']?.sub;
 
       if (!userId) {
-        throw new UnauthorizedException('User not authenticated');
+        throw new UnauthorizedException('User not authenticated or token missing subject');
       }
 
       const userProfile = await this.authService.getUserProfile(userId);
