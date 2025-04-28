@@ -11,28 +11,27 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = request.cookies?.['auth-token']; // Extract token from cookie
+    const token = request.cookies?.['auth-token'];
+    this.logger.debug(`[Guard] Checking for auth token in cookie...`); // Log entry
 
     if (!token) {
-      this.logger.warn('No auth token found in cookie');
+      this.logger.warn('[Guard] No auth token found in cookie. Rejecting.');
       throw new UnauthorizedException('Authentication token not found');
     }
+    
+    this.logger.debug(`[Guard] Auth token found. Verifying... Token starts with: ${token.substring(0, 10)}...`); // Log token presence
 
     try {
-      // Verify the token using the secret configured in JwtService
-      // No need to specify secret here if JwtModule is configured correctly
       const payload = await this.jwtService.verifyAsync(token);
+      this.logger.debug(`[Guard] Token verification successful. Payload sub: ${payload?.sub}`); // Log success
       
-      // Attach the payload to the request object
-      // So we can access it in our route handlers
       request.user = payload;
       
     } catch (error: any) {
-      this.logger.error(`Token verification failed: ${error?.message || error}`, error?.stack);
-      // Clear potentially invalid cookie?
-      // context.switchToHttp().getResponse().clearCookie('auth-token');
+      this.logger.error(`[Guard] Token verification failed: ${error?.message || error}`, error?.stack); // Log failure reason
       throw new UnauthorizedException('Invalid or expired token');
     }
-    return true; // Token is valid, allow access
+    this.logger.debug('[Guard] Granting access.'); // Log granting access
+    return true; 
   }
 } 
