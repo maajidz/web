@@ -45,7 +45,6 @@
         }
       ],
       "destination": "https://www.flattr.io/$1",
-      "statusCode": 307,
       "permanent": false
     }
   ],
