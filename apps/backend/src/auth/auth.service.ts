@@ -15,6 +15,7 @@ import { UserProfile, DbUserProfile } from './entities/user-profile.entity'; // 
 import { TruecallerCallbackDto } from './dto/truecaller-callback.dto'; // Correct import
 import { ConfigService } from '@nestjs/config'; // Import ConfigService
 import { URLSearchParams } from 'url'; // Import URLSearchParams
+import { UsersService } from '../users/users.service'; // +++ Add UsersService import
 
 // Interface for the expected Truecaller profile structure
 // Adjust based on the actual data returned by their API
@@ -51,6 +52,7 @@ export class AuthService {
     private readonly supabaseService: SupabaseService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService, // Inject ConfigService
+    private readonly usersService: UsersService, // +++ Inject UsersService
   ) {}
 
   // Add a decodeToken method to help with debugging
@@ -426,7 +428,7 @@ export class AuthService {
   // +++ IMPLEMENTING LINKEDIN METHOD +++
   async exchangeLinkedInCode(
     code: string,
-    codeVerifier: string, 
+    codeVerifier: string,
   ): Promise<{ success: boolean; userId?: string; access_token?: string; error?: string }> {
     this.logger.log(`[LinkedIn] Exchanging code for token. Code starts: ${code?.substring(0, 10)}...`);
 
@@ -434,6 +436,7 @@ export class AuthService {
     const clientSecret = this.configService.get<string>('LINKEDIN_CLIENT_SECRET');
     const redirectUri = this.configService.get<string>('LINKEDIN_REDIRECT_URI');
     const tokenUrl = 'https://www.linkedin.com/oauth/v2/accessToken';
+    const userInfoUrl = 'https://api.linkedin.com/v2/userinfo'; // +++ UserInfo endpoint
 
     if (!clientId || !clientSecret || !redirectUri) {
         this.logger.error('[LinkedIn] Missing required environment variables (ID, SECRET, or REDIRECT_URI)');
@@ -449,7 +452,10 @@ export class AuthService {
     params.append('redirect_uri', redirectUri);
     params.append('client_id', clientId);
     params.append('client_secret', clientSecret);
-    params.append('code_verifier', codeVerifier); 
+    // OIDC spec might not require code_verifier for token exchange, but including if needed by LinkedIn
+    // params.append('code_verifier', codeVerifier); 
+
+    let linkedinAccessToken: string; // Define variable to hold the token
 
     try {
       // --- Using direct axios call instead of HttpService ---
@@ -462,8 +468,8 @@ export class AuthService {
       const tokenResponse = response.data; // Axios puts data directly in response.data
       // --- End direct axios call ---
 
-      const linkedinAccessToken = tokenResponse.access_token;
-      // const linkedinIdToken = tokenResponse.id_token; 
+      linkedinAccessToken = tokenResponse.access_token; // Assign token
+      // const linkedinIdToken = tokenResponse.id_token; // ID token also available if needed
 
       if (!linkedinAccessToken) {
           this.logger.error('[LinkedIn] No access_token received from LinkedIn.');
@@ -472,36 +478,86 @@ export class AuthService {
 
       this.logger.log(`[LinkedIn] Access token received: ${linkedinAccessToken.substring(0, 10)}...`);
 
-      // --- TODO Steps --- 
-      this.logger.warn('[LinkedIn] User info fetching not yet implemented.');
-      this.logger.warn('[LinkedIn] User validation/login not yet implemented.');
-      this.logger.warn('[LinkedIn] JWT generation not yet implemented for LinkedIn flow.');
-      return { success: false, error: 'LinkedInFlowIncomplete' };
+      // +++ Fetch User Info from LinkedIn +++
+      const userInfoResponse = await axios.get(userInfoUrl, {
+        headers: {
+          Authorization: `Bearer ${linkedinAccessToken}`,
+        },
+      });
+
+      const linkedInUserInfo = userInfoResponse.data;
+      this.logger.log(`[LinkedIn] UserInfo received: ${JSON.stringify(linkedInUserInfo)}`);
+
+      const linkedinUserId = linkedInUserInfo.sub; // OpenID Connect standard subject identifier
+      const email = linkedInUserInfo.email;
+      const firstName = linkedInUserInfo.given_name;
+      const lastName = linkedInUserInfo.family_name;
+      const pictureUrl = linkedInUserInfo.picture;
+      const emailVerified = linkedInUserInfo.email_verified; // boolean
+
+      if (!linkedinUserId || !email) {
+         this.logger.error('[LinkedIn] Missing required user info (sub or email) from /userinfo endpoint.');
+         return { success: false, error: 'LinkedInUserInfoIncomplete' };
+      }
+
+      // +++ Find or Create User in our DB +++
+      // Assuming a method exists in UsersService like findOrCreateUserByProvider
+      const user = await this.usersService.findOrCreateUserByProvider(
+          'linkedin',
+          linkedinUserId,
+          {
+              email,
+              firstName,
+              lastName,
+              profilePictureUrl: pictureUrl,
+              emailVerified, // Pass verification status
+          }
+      );
+
+      if (!user) {
+          this.logger.error(`[LinkedIn] Failed to find or create user with LinkedIn ID: ${linkedinUserId}`);
+          return { success: false, error: 'UserCreationFailed' };
+      }
+
+      this.logger.log(`[LinkedIn] User found/created in DB: ID ${user.id}`);
+
+      // +++ Generate JWT for the user +++
+      const payload = { sub: user.id, email: user.email }; // Use our internal user ID for JWT subject
+      const jwtToken = await this.jwtService.signAsync(payload);
+
+      this.logger.log(`[LinkedIn] JWT generated successfully for user ${user.id}`);
+
+      return { success: true, userId: user.id, access_token: jwtToken };
+      // --- End User Info Fetching & User Creation ---
 
     } catch (error) { // Keep catch (error), but check type inside
         // Handle Axios error structure
         let status = HttpStatus.INTERNAL_SERVER_ERROR;
-        let errorDetails = 'Unknown error during LinkedIn code exchange';
+        let errorDetails = 'Unknown error during LinkedIn flow'; // Modified default message
         let loggedStack: string | undefined = undefined;
 
         if (axios.isAxiosError(error)) { // Use type guard
             status = error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
+            // Distinguish between token exchange failure and userinfo failure
+            const failedUrl = error.config?.url;
+            const failurePoint = failedUrl === tokenUrl ? 'token exchange' : (failedUrl === userInfoUrl ? 'user info fetch' : 'request');
+            
             errorDetails = JSON.stringify(error.response?.data) || error.message;
             loggedStack = error.stack;
-            this.logger.error(`[LinkedIn] Axios Error exchanging code: ${status} - ${errorDetails}`, loggedStack);
+            this.logger.error(`[LinkedIn] Axios Error during ${failurePoint}: ${status} - ${errorDetails}`, loggedStack);
         } else if (error instanceof Error) { // Handle generic Error
             errorDetails = error.message;
             loggedStack = error.stack;
-            this.logger.error(`[LinkedIn] Non-Axios Error during code exchange: ${errorDetails}`, loggedStack);
+            this.logger.error(`[LinkedIn] Non-Axios Error during LinkedIn flow: ${errorDetails}`, loggedStack);
         } else { // Handle other unknown throws
             errorDetails = String(error);
-            this.logger.error(`[LinkedIn] Unknown error type during code exchange: ${errorDetails}`);
+            this.logger.error(`[LinkedIn] Unknown error type during LinkedIn flow: ${errorDetails}`);
         }
        
        // Return specific error if possible, otherwise generic
-       // Return the actual status if it's a known HTTP error from LinkedIn
-       const returnErrorMsg = status !== HttpStatus.INTERNAL_SERVER_ERROR 
-         ? `LinkedInTokenExchangeFailed - Status ${status}` 
+       // Let the specific error codes from above handle specific failures like LinkedInTokenMissing
+       const returnErrorMsg = status !== HttpStatus.INTERNAL_SERVER_ERROR && axios.isAxiosError(error)
+         ? `LinkedInRequestFailed - Status ${status}`
          : 'InternalServerError';
        return { success: false, error: returnErrorMsg };
     }

@@ -6,6 +6,7 @@ import { SupabaseModule } from '../supabase/supabase.module'; // Needed for data
 import { JwtModule } from '@nestjs/jwt'; // Import JwtModule
 import { ConfigModule, ConfigService } from '@nestjs/config'; // Import ConfigModule and ConfigService
 import { Buffer } from 'buffer'; // Import Buffer
+import { UsersModule } from '../users/users.module'; // Import UsersModule
 // import { jwtConstants } from './constants'; // No longer needed if using ConfigService
 
 @Module({
@@ -13,6 +14,7 @@ import { Buffer } from 'buffer'; // Import Buffer
     ConfigModule, // Ensure ConfigModule is imported (needed for ConfigService injection)
     HttpModule, // Make HttpService available
     SupabaseModule, // Make SupabaseService available
+    UsersModule, // Add UsersModule here
     JwtModule.registerAsync({
       imports: [ConfigModule], // Import ConfigModule here too
       useFactory: async (configService: ConfigService) => {
