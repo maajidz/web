@@ -48,5 +48,6 @@
       "statusCode": 307,
       "permanent": false
     }
-  ]
+  ],
+  "version": 2
 }
