@@ -21,7 +21,7 @@ Use the following settings when creating a new backend project in Vercel:
 
 ## Environment Variables
 
-Add the following environment variables:
+Add the following environment variables:s
 
 ```
 NODE_ENV=production
