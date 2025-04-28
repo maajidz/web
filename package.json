@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "turbo run dev",
-    "build": "turbo run build",
+    "build": "echo 'Skipping root build script on Vercel. Build configured in vercel.json.'",
     "start": "turbo run start",
     "lint": "turbo run lint",
     "test": "turbo run test",
