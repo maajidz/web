@@ -440,6 +440,11 @@ export class AuthService {
       return { success: false, error: 'LinkedInConfigMissing' };
     }
 
+    // +++ Add Logging for Credentials (Masked Secret) +++
+    const maskedSecret = clientSecret ? `${clientSecret.substring(0, 3)}...${clientSecret.substring(clientSecret.length - 3)}` : 'SECRET_MISSING';
+    this.logger.debug(`[LinkedIn] Attempting token exchange with ClientID: ${clientId}, Masked Secret: ${maskedSecret}, Redirect URI: ${redirectUri}`);
+    // +++ End Logging +++
+
     // Prepare form data for LinkedIn token request
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
